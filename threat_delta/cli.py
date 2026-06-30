@@ -25,10 +25,8 @@ import argparse
 import json
 import sys
 
-from .baseline import load_baseline
-from .diff import load_annotations, load_diff, load_findings
 from .llm import LLMClient, LLMConfig, ScriptedLLMClient
-from .pipeline import analyze
+from .step import needs_human_review, run_step
 
 
 def _build_llm(kind: str) -> LLMClient:
@@ -83,20 +81,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
-    baseline = load_baseline(args.baseline)
-    diff = load_diff(args.diff)
-    annotations = load_annotations(args.annotations)
-    findings = load_findings(args.findings)
-    llm = _build_llm(args.llm)
-
-    pr = args.pr or diff.pr or "0"
-    result = analyze(
-        diff,
-        baseline,
-        annotations,
-        findings,
-        llm,
-        pr=pr,
+    # The CLI is a thin wrapper over the standalone pipeline entry point.
+    result = run_step(
+        baseline=args.baseline,
+        diff=args.diff,
+        annotations=args.annotations,
+        findings=args.findings,
+        pr=args.pr,
+        llm=_build_llm(args.llm),
         max_hunk_chars=args.max_hunk_chars,
     )
 
@@ -113,14 +105,10 @@ def main(argv: list[str] | None = None) -> int:
     # Always print the human-readable comment to stdout for log visibility.
     print(result.comment)
 
-    needs_review = [
-        d
-        for d in result.deltas
-        if d.severity.value == "high" and d.requires_human_review
-    ]
-    if args.fail_on_high and needs_review:
+    review = needs_human_review(result)
+    if args.fail_on_high and review:
         print(
-            f"\n::error::{len(needs_review)} high-severity delta(s) require human "
+            f"\n::error::{len(review)} high-severity delta(s) require human "
             "review (security/needs-review).",
             file=sys.stderr,
         )

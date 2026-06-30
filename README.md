@@ -79,6 +79,33 @@ when a `high`-severity delta requires human review (pair it with a
 `security/needs-review` label + branch protection if you want a *human* gate —
 never a model gate).
 
+### As a standalone pipeline function
+
+The step is callable as a single function so a larger orchestrator can drop it in
+without knowing the internal stages. Every input may be a path **or** an
+in-memory object:
+
+```python
+from threat_delta import run_step, needs_human_review
+
+result = run_step(
+    baseline="threat-model.yaml",          # path or Baseline
+    diff="pr.diff",                        # path or Diff
+    annotations="annotations.json",        # path / list / None
+    findings="findings.json",              # path / list / None
+    pr="1234",
+    llm=my_local_model_client,             # defaults to the offline stub
+)
+
+result.deltas      # list[Delta]
+result.sarif       # SARIF 2.1.0 dict
+result.comment     # PR-comment markdown
+needs_human_review(result)  # high-severity deltas for the optional gate
+```
+
+`run_step` never blocks — it returns results and leaves gating to the caller
+(spec §9). The CLI is just a thin wrapper over it.
+
 ### Wiring a model
 
 The CLI ships only an offline **stub** transport (`--llm stub`), which is

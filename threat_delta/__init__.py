@@ -32,6 +32,7 @@ from .models import (
 from .baseline import Baseline, BaselineError, load_baseline, parse_baseline
 from .llm import LLMClient, LLMConfig, LLMError, ScriptedLLMClient, SYSTEM_PREAMBLE
 from .pipeline import AnalysisResult, analyze
+from .step import needs_human_review, run_step
 
 __version__ = "0.1.0"
 
@@ -47,5 +48,7 @@ __all__ = [
     "LLMClient", "LLMConfig", "LLMError", "ScriptedLLMClient", "SYSTEM_PREAMBLE",
     # pipeline
     "AnalysisResult", "analyze",
+    # standalone step entry point
+    "run_step", "needs_human_review",
     "__version__",
 ]
