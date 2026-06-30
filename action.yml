@@ -1,0 +1,110 @@
+# Composite GitHub Action — integrate the Threat-Model Delta step directly from
+# this repo with one line in a consumer workflow:
+#
+#   - uses: Devko/pipeThreat@main
+#     with:
+#       baseline: threat-model.yaml
+#
+# It installs the package from *this action's own checkout* (no network/git
+# install needed), resolves the PR diff if one isn't supplied, runs the step, and
+# exposes the SARIF + comment as outputs for the caller to upload/post.
+name: "Threat-Model Delta"
+description: "Advisory, non-blocking threat-model delta analysis for a pull request (pipeline step 6)."
+author: "pipeThreat"
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  baseline:
+    description: "Path to the threat-model.yaml baseline (in the consumer repo)."
+    required: false
+    default: "threat-model.yaml"
+  diff:
+    description: "Path to a unified/structured diff. If empty, it is computed from the PR base ref."
+    required: false
+    default: ""
+  base-ref:
+    description: "Git ref to diff HEAD against when computing the diff. Defaults to the PR base branch."
+    required: false
+    default: ""
+  annotations:
+    description: "Path to step-5 annotations JSON (optional)."
+    required: false
+    default: ""
+  findings:
+    description: "Path to step 2-4 findings JSON (optional)."
+    required: false
+    default: ""
+  pr:
+    description: "PR number/identifier. Defaults to the triggering pull request."
+    required: false
+    default: ""
+  fail-on-high:
+    description: "If 'true', exit non-zero when a high-severity delta needs human review (optional gate)."
+    required: false
+    default: "false"
+  max-hunk-chars:
+    description: "Per-component hunk budget for the STRIDE call."
+    required: false
+    default: "4000"
+  python-version:
+    description: "Python version to set up."
+    required: false
+    default: "3.11"
+
+outputs:
+  sarif:
+    description: "Path to the generated SARIF 2.1.0 file."
+    value: ${{ steps.run.outputs.sarif }}
+  comment:
+    description: "Path to the generated PR-comment markdown."
+    value: ${{ steps.run.outputs.comment }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install threat-delta (from this action's repo)
+      shell: bash
+      run: pip install "${{ github.action_path }}"
+
+    - name: Resolve PR diff
+      id: diff
+      shell: bash
+      run: |
+        set -euo pipefail
+        DIFF_PATH="${{ inputs.diff }}"
+        if [ -z "$DIFF_PATH" ]; then
+          BASE="${{ inputs.base-ref }}"
+          if [ -z "$BASE" ]; then BASE="origin/${{ github.base_ref }}"; fi
+          DIFF_PATH="${RUNNER_TEMP:-/tmp}/threat-delta-pr.diff"
+          echo "Computing diff: git diff ${BASE}...HEAD"
+          git diff "${BASE}...HEAD" > "$DIFF_PATH" || git diff "${BASE}" HEAD > "$DIFF_PATH"
+        fi
+        echo "path=$DIFF_PATH" >> "$GITHUB_OUTPUT"
+
+    - name: Run threat-model delta
+      id: run
+      shell: bash
+      run: |
+        set -euo pipefail
+        OUT="${RUNNER_TEMP:-/tmp}"
+        PR="${{ inputs.pr }}"
+        if [ -z "$PR" ]; then PR="${{ github.event.pull_request.number }}"; fi
+        ARGS=(--baseline "${{ inputs.baseline }}"
+              --diff "${{ steps.diff.outputs.path }}"
+              --pr "$PR"
+              --max-hunk-chars "${{ inputs.max-hunk-chars }}"
+              --sarif "$OUT/threat-delta.sarif"
+              --comment "$OUT/threat-delta.md")
+        if [ -n "${{ inputs.annotations }}" ]; then ARGS+=(--annotations "${{ inputs.annotations }}"); fi
+        if [ -n "${{ inputs.findings }}" ]; then ARGS+=(--findings "${{ inputs.findings }}"); fi
+        if [ "${{ inputs.fail-on-high }}" = "true" ]; then ARGS+=(--fail-on-high); fi
+        threat-delta "${ARGS[@]}"
+        echo "sarif=$OUT/threat-delta.sarif" >> "$GITHUB_OUTPUT"
+        echo "comment=$OUT/threat-delta.md" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,36 @@
+# CI: prove the package installs and runs straight from the repo.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install (with dev extras)
+        run: pip install -e '.[dev]'
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Smoke-test the CLI on the bundled example
+        run: |
+          threat-delta \
+            --baseline examples/threat-model.yaml \
+            --diff examples/pr-1234.diff \
+            --annotations examples/pr-1234.annotations.json \
+            --pr 1234 \
+            --sarif "$RUNNER_TEMP/out.sarif" \
+            --comment "$RUNNER_TEMP/out.md"
+          python -c "import json,sys; d=json.load(open('$RUNNER_TEMP/out.sarif')); assert d['version']=='2.1.0'; print('SARIF OK')"
