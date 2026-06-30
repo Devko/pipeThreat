@@ -14,6 +14,8 @@ that is not a valid :class:`Stride` value is dropped rather than coerced.
 
 from __future__ import annotations
 
+import re
+
 from . import prompts
 from .llm import LLMClient
 from .models import Component, Flags, Hunk, Stride, StrideDelta
@@ -22,6 +24,58 @@ from .models import Component, Flags, Hunk, Stride, StrideDelta
 # Cap on a single delta's reason — the prompt asks for <=20 words; this is a
 # hard character backstop so a rambling model cannot bloat the output.
 _MAX_REASON_CHARS = 200
+
+
+def _norm(text: str) -> str:
+    """Lowercase and strip everything but letters (for tolerant matching)."""
+    return re.sub(r"[^a-z]", "", text.lower())
+
+
+# Canonical enum values, keyed by their normalized spelling.
+_STRIDE_BY_NORM = {_norm(s.value): s for s in Stride}
+
+# Common formatting variants / synonyms a model may emit instead of the exact
+# enum spelling (e.g. "Information Disclosure", "Elevation of Privileges", "DoS").
+_STRIDE_ALIASES = {
+    "disclosure": Stride.INFORMATION_DISCLOSURE,
+    "infodisclosure": Stride.INFORMATION_DISCLOSURE,
+    "dos": Stride.DENIAL_OF_SERVICE,
+    "elevationofprivileges": Stride.ELEVATION_OF_PRIVILEGE,
+    "privilegeescalation": Stride.ELEVATION_OF_PRIVILEGE,
+    "eop": Stride.ELEVATION_OF_PRIVILEGE,
+}
+
+# Single-letter STRIDE codes.
+_STRIDE_LETTERS = {
+    "s": Stride.SPOOFING,
+    "t": Stride.TAMPERING,
+    "r": Stride.REPUDIATION,
+    "i": Stride.INFORMATION_DISCLOSURE,
+    "d": Stride.DENIAL_OF_SERVICE,
+    "e": Stride.ELEVATION_OF_PRIVILEGE,
+}
+
+
+def coerce_stride(raw) -> Stride | None:
+    """Map a model-supplied STRIDE label to a :class:`Stride`, tolerantly.
+
+    Accepts the exact enum spelling plus common variants: spacing/casing/
+    punctuation differences ("Information Disclosure", "information_disclosure"),
+    synonyms ("DoS", "privilege escalation"), and single-letter codes ("I").
+    Returns ``None`` for anything unrecognized (the hallucination guard).
+    """
+    if raw is None:
+        return None
+    norm = _norm(str(raw))
+    if not norm:
+        return None
+    if norm in _STRIDE_BY_NORM:
+        return _STRIDE_BY_NORM[norm]
+    if norm in _STRIDE_ALIASES:
+        return _STRIDE_ALIASES[norm]
+    if len(norm) == 1 and norm in _STRIDE_LETTERS:
+        return _STRIDE_LETTERS[norm]
+    return None
 
 _TRUNCATION_MARKER = "\n... [truncated]"
 
@@ -71,11 +125,9 @@ def stride_deltas(
     for item in raw_deltas:
         if not isinstance(item, dict):
             continue
-        stride_raw = item.get("stride")
-        try:
-            stride = Stride(stride_raw)
-        except ValueError:
-            # Hallucination guard: unknown STRIDE label -> drop the entry.
+        stride = coerce_stride(item.get("stride"))
+        if stride is None:
+            # Hallucination guard: unrecognized STRIDE label -> drop the entry.
             continue
         reason = str(item.get("reason", "")).strip()[:_MAX_REASON_CHARS]
         deltas.append(

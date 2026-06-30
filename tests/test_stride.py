@@ -85,3 +85,34 @@ def test_non_list_deltas_returns_empty():
     llm = ScriptedLLMClient(responses={"user_service": {"deltas": "oops"}})
     out = stride_deltas(_comp(), [Hunk(content="x")], Flags(new_entry_point=True), llm)
     assert out == []
+
+
+def test_coerce_stride_tolerates_formatting_variants():
+    from threat_delta.stride import coerce_stride
+    from threat_delta.models import Stride
+
+    # Exact, spaced, cased, punctuated, synonym, and single-letter forms.
+    assert coerce_stride("InformationDisclosure") == Stride.INFORMATION_DISCLOSURE
+    assert coerce_stride("Information Disclosure") == Stride.INFORMATION_DISCLOSURE
+    assert coerce_stride("information_disclosure") == Stride.INFORMATION_DISCLOSURE
+    assert coerce_stride("Elevation of Privilege") == Stride.ELEVATION_OF_PRIVILEGE
+    assert coerce_stride("privilege escalation") == Stride.ELEVATION_OF_PRIVILEGE
+    assert coerce_stride("DoS") == Stride.DENIAL_OF_SERVICE
+    assert coerce_stride("I") == Stride.INFORMATION_DISCLOSURE
+    # Unknown still rejected.
+    assert coerce_stride("Banana") is None
+    assert coerce_stride("") is None
+    assert coerce_stride(None) is None
+
+
+def test_stride_deltas_accepts_spaced_labels():
+    from threat_delta.llm import ScriptedLLMClient
+    from threat_delta.models import Component, Flags, Hunk, Stride
+    from threat_delta.stride import stride_deltas
+
+    comp = Component(id="comp.x", name="X", trust_zone="edge", code_paths=("src/**",))
+    llm = ScriptedLLMClient(
+        default={"deltas": [{"stride": "Information Disclosure", "reason": "leak"}]}
+    )
+    out = stride_deltas(comp, [Hunk(content="+code")], Flags(new_entry_point=True), llm)
+    assert [d.stride for d in out] == [Stride.INFORMATION_DISCLOSURE]

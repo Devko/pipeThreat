@@ -88,6 +88,16 @@ runs:
     # run on a given model pays the ~3GB download. A 4B quantized model runs on
     # the CPU-only GitHub runner — slow per call, but the step makes only 3-5
     # calls per PR and is async/non-blocking (spec's "CPU-only CI runner, ~4B").
+    - name: Free disk space
+      # A multi-GB model plus its cache tarball can overrun the runner's free
+      # space; reclaim ~12GB+ by removing preinstalled toolchains we don't use.
+      if: ${{ inputs.llm == 'ollama' }}
+      shell: bash
+      run: |
+        sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+          /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
+        df -h /
+
     - name: Cache Ollama model
       if: ${{ inputs.llm == 'ollama' }}
       uses: actions/cache@v4
