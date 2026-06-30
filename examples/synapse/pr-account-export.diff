@@ -1,0 +1,45 @@
+diff --git a/synapse/rest/client/account_export.py b/synapse/rest/client/account_export.py
+new file mode 100644
+index 0000000..b1f2a3c
+--- /dev/null
++++ b/synapse/rest/client/account_export.py
+@@ -0,0 +1,38 @@
++# New client-server endpoint: export a user's full account data.
++from synapse.http.server import DirectServeJsonResource
++from synapse.http.servlet import parse_string
++
++
++class AccountExportResource(DirectServeJsonResource):
++    """GET /_matrix/client/v3/account_export?user_id=@alice:example.org
++
++    Returns the full account data (profile, account_data, recent room events)
++    for the requested user id.
++    """
++
++    def __init__(self, hs):
++        super().__init__()
++        self.store = hs.get_datastores().main
++        self.handler = hs.get_account_data_handler()
++
++    async def _async_render_GET(self, request):
++        # NOTE: reads the target straight from the query string. No access-token
++        # check, no requester/user_id binding, no admin check.
++        user_id = parse_string(request, "user_id", required=True)
++
++        profile = await self.store.get_profileinfo(user_id)
++        account_data = await self.handler.get_global_account_data(user_id)
++        recent_events = await self.store.get_recent_events_for_user(user_id, limit=100)
++
++        return 200, {
++            "user_id": user_id,
++            "profile": profile.__dict__,
++            "account_data": account_data,
++            "recent_events": [e.get_dict() for e in recent_events],
++        }
++
++
++def register_servlets(hs, http_server):
++    # Mounted on the public client-server API with no auth requirement.
++    http_server.register_paths(
++        "GET", [r"/_matrix/client/v3/account_export$"], AccountExportResource(hs), "account_export"
++    )

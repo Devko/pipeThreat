@@ -150,6 +150,18 @@ mints asset ids and resolves references, so the draft always passes `validate`.
 The output is labelled `DRAFT — HUMAN REVIEW REQUIRED`; review and commit it as
 source.
 
+## Worked example (Matrix Synapse)
+
+[`examples/synapse/`](examples/synapse/) runs the whole step end-to-end against a
+real, recognizable project. A PR adds a client endpoint that exports **any user's**
+account data by `user_id` with no auth check; the step returns **5 High-severity
+deltas** — STRIDE (InformationDisclosure / ElevationOfPrivilege / Spoofing) plus
+three contradicted assumptions — each needing human review. See the generated
+[`report/threat-delta.md`](examples/synapse/report/threat-delta.md) and
+[`report/threat-delta.sarif`](examples/synapse/report/threat-delta.sarif), and
+`examples/synapse/README.md` for the walk-through. Regenerate with
+`python examples/synapse/generate_report.py`.
+
 ## How it works
 
 | Stage | What | Kind |

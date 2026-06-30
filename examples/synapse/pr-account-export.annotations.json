@@ -1,0 +1,12 @@
+[
+  {
+    "path": "synapse/rest/client/account_export.py",
+    "entry_points": ["http_client_api"],
+    "untrusted_inputs": ["request.query.user_id"],
+    "sinks": [
+      "store.get_profileinfo",
+      "handler.get_global_account_data",
+      "store.get_recent_events_for_user"
+    ]
+  }
+]

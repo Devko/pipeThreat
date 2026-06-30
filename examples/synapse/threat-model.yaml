@@ -1,0 +1,132 @@
+# Illustrative threat-model baseline for Matrix Synapse (github.com/element-hq/synapse).
+#
+# This is a DEMONSTRATION baseline authored to show the Threat-Model Delta step
+# on a real, recognizable open-source project. The components and code_paths
+# mirror Synapse's actual package layout (synapse/rest/client, synapse/federation,
+# synapse/storage, ...), but the model is intentionally small and is NOT an
+# authoritative threat model for the project. Treat it as a worked example.
+system:
+  name: matrix-synapse
+  version: "demo-2026.06"
+  description: Matrix homeserver — client-server API + server-to-server federation.
+
+assets:
+  - id: asset.access_token
+    name: User access tokens
+    sensitivity: critical
+  - id: asset.e2e_room_keys
+    name: End-to-end room/device keys
+    sensitivity: critical
+  - id: asset.message_content
+    name: Room message content / events
+    sensitivity: high
+  - id: asset.account_data
+    name: User account data & profile (PII)
+    sensitivity: high
+  - id: asset.media
+    name: Uploaded media
+    sensitivity: medium
+
+trust_boundaries:
+  - id: tb.client_edge
+    name: Internet to Client-Server API
+    description: External Matrix clients reaching the homeserver's client API.
+    controls: [tls_termination, access_token_auth, rate_limit]
+  - id: tb.federation_edge
+    name: Federation to Homeserver
+    description: Remote homeservers reaching this server over federation.
+    controls: [server_signature_verification, server_acl]
+  - id: tb.app_database
+    name: Application to Database
+    description: Homeserver processes reaching the backing store.
+    controls: [network_isolation, db_credentials]
+
+components:
+  - id: comp.client_api
+    name: Client-Server REST API
+    trust_zone: edge
+    code_paths: ["synapse/rest/client/**"]
+    handles_assets: [asset.access_token, asset.message_content, asset.account_data]
+    entry_points: [http_client_api]
+  - id: comp.admin_api
+    name: Admin API
+    trust_zone: internal
+    code_paths: ["synapse/rest/admin/**"]
+    handles_assets: [asset.account_data, asset.access_token]
+    entry_points: [http_admin]
+  - id: comp.federation
+    name: Federation Endpoints
+    trust_zone: edge
+    code_paths: ["synapse/federation/**"]
+    handles_assets: [asset.message_content]
+    entry_points: [http_federation]
+  - id: comp.media
+    name: Media Repository
+    trust_zone: edge
+    code_paths: ["synapse/media/**", "synapse/rest/media/**"]
+    handles_assets: [asset.media]
+    entry_points: [http_media]
+  - id: comp.handlers
+    name: Core Handlers (business logic)
+    trust_zone: internal
+    code_paths: ["synapse/handlers/**"]
+    handles_assets: [asset.message_content, asset.account_data, asset.e2e_room_keys]
+    entry_points: []
+  - id: comp.auth
+    name: Authentication & Authorization
+    trust_zone: internal
+    code_paths: ["synapse/api/auth.py", "synapse/api/auth/**"]
+    handles_assets: [asset.access_token]
+    entry_points: []
+  - id: comp.storage
+    name: Storage / Database Layer
+    trust_zone: internal
+    code_paths: ["synapse/storage/**"]
+    handles_assets:
+      [asset.message_content, asset.account_data, asset.access_token, asset.e2e_room_keys]
+    entry_points: []
+
+data_flows:
+  - id: flow.client_to_handlers
+    from: comp.client_api
+    to: comp.handlers
+    crosses: []
+    assets: [asset.message_content, asset.account_data]
+  - id: flow.federation_in
+    from: comp.federation
+    to: comp.handlers
+    crosses: [tb.federation_edge]
+    assets: [asset.message_content]
+  - id: flow.handlers_to_storage
+    from: comp.handlers
+    to: comp.storage
+    crosses: [tb.app_database]
+    assets: [asset.message_content, asset.account_data, asset.e2e_room_keys]
+
+assumptions:
+  - id: asm.client_requires_token
+    statement: >-
+      Every client-server API endpoint requires a valid access token, except the
+      small documented unauthenticated set (login, register, .well-known).
+  - id: asm.admin_requires_admin
+    statement: >-
+      Admin API endpoints and any endpoint returning another user's data require a
+      server-admin access token.
+  - id: asm.user_scoped_access
+    statement: >-
+      A client request can only read or modify data belonging to the
+      authenticated user, never arbitrary users by id.
+  - id: asm.federation_signature
+    statement: >-
+      All inbound federation requests are signature-verified against the origin
+      server's published signing keys before processing.
+  - id: asm.e2e_keys_never_plaintext
+    statement: >-
+      End-to-end room/device keys are never exposed in plaintext to the server or
+      written to logs.
+
+accepted_risks:
+  - id: risk.metadata_visible
+    statement: >-
+      Message metadata (timestamps, room membership) is visible to the homeserver;
+      accepted by design of the Matrix protocol.
