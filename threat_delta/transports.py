@@ -77,7 +77,7 @@ class OpenAICompatibleClient(LLMClient):
         self.extra_body = dict(extra_body) if extra_body else {}
         self.http_post: HttpPost = http_post or _urllib_post
         # Reasoning hints are best-effort: some servers/models (e.g. a
-        # non-thinking gemma3:4b on Ollama) reject `reasoning_effort` with a 400.
+        # non-thinking gemma4:e4b on Ollama) reject `reasoning_effort` with a 400.
         # We send it by default but disable it for this client after the first
         # such rejection, then retry without it.
         self._reasoning_enabled = True
@@ -184,7 +184,7 @@ class OllamaClient(OpenAICompatibleClient):
     ) -> None:
         super().__init__(
             base_url=base_url,
-            model=model or "gemma3:4b",
+            model=model or "gemma4:e4b",
             api_key=api_key,
             config=config,
             extra_body=extra_body,

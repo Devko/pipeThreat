@@ -50,7 +50,7 @@ DEFAULT_STAGE_BUDGETS = {
 
 @dataclass
 class LLMConfig:
-    model: str = "gemma-4-e4b"
+    model: str = "gemma4:e4b"
     temperature: float = 0.0
     max_tokens: int = 512
     # Reasoning/thinking ON for the analysis calls, but capped (spec §2/§11).

@@ -56,7 +56,7 @@ def _add_llm_args(p: argparse.ArgumentParser) -> None:
         help="LLM transport (default: stub — offline, reports nothing)",
     )
     p.add_argument("--llm-base-url", help="OpenAI-compatible server base URL")
-    p.add_argument("--llm-model", help="model name (e.g. gemma3:4b)")
+    p.add_argument("--llm-model", help="model name (e.g. gemma4:e4b)")
 
 
 # --------------------------------------------------------------------------- #
@@ -87,7 +87,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="use an LLM to draft judgment fields (default: stub = deterministic only)",
     )
     i.add_argument("--llm-base-url", help="OpenAI-compatible server base URL")
-    i.add_argument("--llm-model", help="model name (e.g. gemma3:4b)")
+    i.add_argument("--llm-model", help="model name (e.g. gemma4:e4b)")
 
     # validate ------------------------------------------------------------ #
     v = sub.add_parser("validate", help="check baseline referential integrity")

@@ -57,10 +57,10 @@ def test_complete_json_parses_dict():
 
 def test_request_body_shape():
     post = RecordingPost()
-    client = OpenAICompatibleClient(http_post=post, model="gemma-4-e4b")
+    client = OpenAICompatibleClient(http_post=post, model="gemma4:e4b")
     client._raw_complete("the-system", "the-prompt", stage="classify")
     body = post.sent_json()
-    assert body["model"] == "gemma-4-e4b"
+    assert body["model"] == "gemma4:e4b"
     assert body["messages"] == [
         {"role": "system", "content": "the-system"},
         {"role": "user", "content": "the-prompt"},
@@ -133,7 +133,7 @@ def test_build_client_ollama():
     client = build_client("ollama")
     assert isinstance(client, OllamaClient)
     assert "11434" in client.base_url
-    assert client.model == "gemma3:4b"
+    assert client.model == "gemma4:e4b"
 
 
 def test_build_client_stub_default():
@@ -157,7 +157,7 @@ def test_build_client_bogus():
 
 def test_reasoning_400_degrades_and_retries():
     """A 400 while sending reasoning_effort disables it and retries without it
-    (mirrors gemma3:4b on Ollama rejecting the hint)."""
+    (mirrors gemma4:e4b on Ollama rejecting the hint)."""
     import io
     import json as _json
     import urllib.error

@@ -57,7 +57,7 @@ inputs:
   llm-model:
     description: "Ollama model to pull/run when llm=ollama (CPU-friendly ~4B)."
     required: false
-    default: "gemma3:4b"
+    default: "gemma4:e4b"
   python-version:
     description: "Python version to set up."
     required: false

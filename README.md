@@ -112,13 +112,13 @@ Three transports ship in `threat_delta.transports` (stdlib only, no extra deps):
 | `--llm` | Client | Default endpoint / model |
 |---|---|---|
 | `stub` (default) | offline, reports nothing rather than hallucinating | — |
-| `ollama` | `OllamaClient` | `http://localhost:11434/v1`, `gemma3:4b` |
+| `ollama` | `OllamaClient` | `http://localhost:11434/v1`, `gemma4:e4b` |
 | `openai` | `OpenAICompatibleClient` | any OpenAI-compatible `/chat/completions` (llama.cpp server, vLLM, LM Studio) |
 
 ```bash
 # Run the analysis against a local Gemma via Ollama:
 threat-delta analyze --baseline threat-model.yaml --diff pr.diff \
-  --llm ollama --llm-model gemma3:4b
+  --llm ollama --llm-model gemma4:e4b
 ```
 
 Or from Python:
@@ -126,7 +126,7 @@ Or from Python:
 ```python
 from threat_delta import run_step, build_client
 result = run_step(baseline="threat-model.yaml", diff="pr.diff",
-                  llm=build_client("ollama", model="gemma3:4b"))
+                  llm=build_client("ollama", model="gemma4:e4b"))
 ```
 
 ### Running Gemma in CI
@@ -140,14 +140,15 @@ real 6b/6c/6d signal, switch the action to provision a local Gemma on the runner
   with:
     baseline: threat-model.yaml
     llm: ollama
-    llm-model: gemma3:4b
+    llm-model: gemma4:e4b
 ```
 
 The action then installs Ollama, **caches** the model weights (so only the first
-run pays the ~3 GB pull), serves it, and points the step at it. A 4 B quantized
-model runs on the standard CPU-only `ubuntu-latest` runner — slow per call (tens
-of seconds), but the step makes only 3–5 calls per PR and is async/non-blocking,
-which is exactly the spec's runtime target ("CPU-only CI runner, local ~4B"). For
+run pays the ~9.6 GB pull), serves it, and points the step at it. Gemma 4 E4B (an
+"effective 4B" edge model) runs on the standard CPU-only `ubuntu-latest` runner —
+slow per call (tens of seconds), but the step makes only 3–5 calls per PR and is
+async/non-blocking, which is exactly the spec's runtime target ("CPU-only CI
+runner, local ~4B / Gemma 4 E4B class"). For
 faster turnaround, point `--llm openai`/the action at a self-hosted runner or an
 internal OpenAI-compatible endpoint instead.
 

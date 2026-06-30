@@ -12,7 +12,7 @@ on:
       model:
         description: "Ollama model to run (CPU-friendly ~4B)"
         required: false
-        default: "gemma3:4b"
+        default: "gemma4:e4b"
 
 permissions:
   contents: read
