@@ -68,12 +68,23 @@ def _rules_for(deltas: list[Delta]) -> list[dict]:
 
 
 def _locations_for(delta: Delta) -> list[dict]:
-    """One physicalLocation per file in ``delta.evidence['files']``."""
-    files = delta.evidence.get("files", []) if delta.evidence else []
-    return [
-        {"physicalLocation": {"artifactLocation": {"uri": file}}}
-        for file in files
-    ]
+    """One physicalLocation per file in ``delta.evidence['files']``.
+
+    When the diff gave us a hunk start line (``evidence['regions']``), the
+    location carries a ``region`` so the finding anchors to the changed lines in
+    the PR diff rather than the whole file.
+    """
+    if not delta.evidence:
+        return []
+    files = delta.evidence.get("files", [])
+    regions = delta.evidence.get("regions", {})
+    locations: list[dict] = []
+    for file in files:
+        physical: dict = {"artifactLocation": {"uri": file}}
+        if file in regions:
+            physical["region"] = {"startLine": regions[file]}
+        locations.append({"physicalLocation": physical})
+    return locations
 
 
 def _result_properties(delta: Delta) -> dict:
@@ -87,6 +98,10 @@ def _result_properties(delta: Delta) -> dict:
         "affected_elements": list(delta.affected_elements),
         "recommended_action": delta.recommended_action,
     }
+    if delta.severity_rationale:
+        props["severity_rationale"] = delta.severity_rationale
+    if delta.change_signals:
+        props["change_signals"] = list(delta.change_signals)
     if delta.proposed_baseline_update is not None:
         props["proposed_baseline_update"] = delta.proposed_baseline_update.to_dict()
     if delta.low_confidence:
@@ -165,6 +180,8 @@ def _format_delta(delta: Delta) -> str:
         title += "  :warning: **needs human review**"
     lines.append(title)
 
+    if delta.change_signals and len(delta.change_signals) > 1:
+        lines.append(f"  - Change signals: {', '.join(delta.change_signals)}")
     stride = ", ".join(s.value for s in delta.stride)
     if stride:
         lines.append(f"  - STRIDE: {stride}")
@@ -175,6 +192,8 @@ def _format_delta(delta: Delta) -> str:
     if delta.low_confidence:
         confidence += " (low confidence)"
     lines.append(f"  - Confidence: {confidence}")
+    if delta.severity_rationale:
+        lines.append(f"  - Why {delta.severity.value}: {delta.severity_rationale}")
 
     if delta.description:
         lines.append(f"  - {delta.description}")

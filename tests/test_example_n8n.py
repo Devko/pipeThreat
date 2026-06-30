@@ -1,7 +1,7 @@
 """Regression test for the n8n worked example.
 
-Asserts the sample produces tiered severity (High assumption violations + Medium
-component deltas) and the Tampering / DenialOfService STRIDE categories.
+Asserts the sample produces tiered severity (High assumption violations + a
+Medium component delta) and the Tampering / DenialOfService STRIDE categories.
 """
 
 from __future__ import annotations
@@ -32,16 +32,21 @@ def test_sample_report_is_tiered():
     result = _load_generator().build_result()
 
     assert result.pr == "8421"
-    assert len(result.deltas) == 6
+    # Three High assumption violations + one Medium collapsed component delta.
+    assert len(result.deltas) == 4
 
     highs = [d for d in result.deltas if d.severity == Severity.HIGH]
     mediums = [d for d in result.deltas if d.severity == Severity.MEDIUM]
-    assert len(highs) == 3 and len(mediums) == 3  # tiered, not all-High
+    assert len(highs) == 3 and len(mediums) == 1  # tiered, not all-High
 
     # The High deltas are the assumption violations; only they need review.
     assert all(d.type == DeltaType.ASSUMPTION_VIOLATION for d in highs)
     assert all(d.requires_human_review for d in highs)
     assert all(not d.requires_human_review for d in mediums)
+
+    # The single Medium delta folds all of the component's change-signals.
+    assert mediums[0].change_signals
+    assert len(mediums[0].change_signals) > 1
 
     # The full STRIDE breadth, including the categories the other examples lack.
     all_stride = {s for d in result.deltas for s in d.stride}

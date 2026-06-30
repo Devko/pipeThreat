@@ -61,25 +61,22 @@ SCRIPTED_MODEL = ScriptedLLMClient(
                 },
             ]
         },
-        # 6d — assumption contradictions.
-        "does this change violate or weaken it?": {
-            "violations": [
-                {
-                    "assumption_id": "asm.webhooks_authenticated",
-                    "violated": True,
-                    "reason": "endpoint verifies no token or signature",
-                },
-                {
-                    "assumption_id": "asm.no_unauthenticated_execution",
-                    "violated": True,
-                    "reason": "an anonymous request triggers workflow execution",
-                },
-                {
-                    "assumption_id": "asm.public_endpoints_rate_limited",
-                    "violated": True,
-                    "reason": "the public endpoint applies no rate limit",
-                },
-            ]
+        # 6d — assumption contradictions, fanned out one call per assumption and
+        # keyed on the assumption id echoed in each single-assumption prompt.
+        "asm.webhooks_authenticated": {
+            "assumption_id": "asm.webhooks_authenticated",
+            "violated": True,
+            "reason": "endpoint verifies no token or signature",
+        },
+        "asm.no_unauthenticated_execution": {
+            "assumption_id": "asm.no_unauthenticated_execution",
+            "violated": True,
+            "reason": "an anonymous request triggers workflow execution",
+        },
+        "asm.public_endpoints_rate_limited": {
+            "assumption_id": "asm.public_endpoints_rate_limited",
+            "violated": True,
+            "reason": "the public endpoint applies no rate limit",
         },
     },
     default={},

@@ -34,7 +34,9 @@ and **executes it synchronously with the request body as trigger data** — with
   `asm.no_unauthenticated_execution` and `asm.public_endpoints_rate_limited`.
 - **6e (score):** **tiered, deterministically** — the assumption violations guard a
   high-sensitivity asset, so they are **High** (needs human review); the
-  flag-derived component deltas land at **Medium**. Six deltas total.
+  component's change-signals collapse into a single **Medium** delta that lists
+  them all (new entry point, trust-boundary crossing, control change) with the
+  full STRIDE set. Four deltas total — three High + one Medium.
 
 This tiering is the point of deterministic severity: the model supplies the same
 facts either way, and §7 rules — not the model — decide what blocks a reviewer's

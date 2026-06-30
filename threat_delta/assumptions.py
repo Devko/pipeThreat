@@ -33,43 +33,58 @@ def assumption_check(
     diff: Diff,
     annotations: list[FileAnnotation],
     llm: LLMClient,
+    *,
+    signals: list[str] | None = None,
 ) -> list[Violation]:
-    """6d — assumptions this change violates/weakens.
+    """6d — assumptions this change violates/weakens, one bounded call each.
 
     Returns ``[]`` without calling the model when there are no assumptions.
-    Otherwise runs one JSON completion and keeps only entries that are both
-    ``violated`` truthy and reference a known ``assumption_id``. A top-level
-    ``"low_confidence": true`` propagates to every produced violation.
+    Otherwise **fans out one call per assumption** (a narrow yes/no question a
+    small model answers far more reliably than a batched list), each voted
+    ``config.votes`` times. An assumption is reported violated when a majority of
+    its samples say so; the vote ``agreement`` is recorded. Unknown
+    ``assumption_id`` values are dropped (hallucination guard, spec §11).
     """
     if not assumptions:
         return []
 
-    known_ids = {a.id for a in assumptions}
-    prompt = prompts.assumption_prompt(assumptions, diff, annotations)
-    result = llm.complete_json(prompt, stage="assumptions", prefer_keys=("violations",))
-
-    low_confidence = _coerce_bool(result.get("low_confidence", False))
-    raw_violations = result.get("violations", [])
-    if not isinstance(raw_violations, list):
-        return []
-
     violations: list[Violation] = []
-    for item in raw_violations:
-        if not isinstance(item, dict):
+    for assumption in assumptions:
+        prompt = prompts.assumption_prompt_single(
+            assumption, diff, annotations, signals=signals
+        )
+        samples = llm.complete_json_samples(
+            prompt, stage="assumptions", prefer_keys=("violated", "assumption_id")
+        )
+        n = len(samples)
+        majority = n // 2 + 1
+
+        votes_violated = 0
+        reason = ""
+        any_low_conf = False
+        for result in samples:
+            if not isinstance(result, dict):
+                continue
+            # Defend against a stub/model that echoes a different id.
+            rid = result.get("assumption_id", assumption.id)
+            if rid not in (assumption.id, None):
+                continue
+            any_low_conf = any_low_conf or _coerce_bool(result.get("low_confidence", False))
+            if _coerce_bool(result.get("violated", False)):
+                votes_violated += 1
+                if not reason:
+                    reason = str(result.get("reason", "")).strip()[:_MAX_REASON_CHARS]
+
+        if votes_violated < majority:
             continue
-        if not _coerce_bool(item.get("violated", False)):
-            continue
-        assumption_id = item.get("assumption_id")
-        if assumption_id not in known_ids:
-            # Hallucination guard: unknown assumption id -> drop.
-            continue
-        reason = str(item.get("reason", "")).strip()[:_MAX_REASON_CHARS]
+        agreement = votes_violated / n
         violations.append(
             Violation(
-                assumption_id=assumption_id,
+                assumption_id=assumption.id,
                 violated=True,
                 reason=reason,
-                low_confidence=low_confidence,
+                low_confidence=any_low_conf or agreement < 1.0,
+                agreement=agreement,
             )
         )
     return violations

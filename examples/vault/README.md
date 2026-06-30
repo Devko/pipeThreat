@@ -34,8 +34,9 @@ Vault's core security boundaries at once.
 - **6d (assumptions):** violates `asm.all_requests_authenticated` (no token),
   `asm.acl_enforced` (no policy check) and `asm.all_access_audited` (no audit entry).
 - **6e (score):** **High** deterministically — `comp.http_api` handles a `critical`
-  asset and the change violates assumptions guarding sensitive assets. Six deltas,
-  all `requires_human_review: true`.
+  asset and the change violates assumptions guarding sensitive assets. Four deltas
+  (three assumption violations + one collapsed component delta), all
+  `requires_human_review: true`.
 
 ## Files
 

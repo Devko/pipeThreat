@@ -17,16 +17,19 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Union
 
+import json
+
 from .baseline import Baseline, load_baseline
 from .diff import load_annotations, load_diff, load_findings
 from .llm import LLMClient, ScriptedLLMClient
 from .models import Delta, Diff, FileAnnotation, Finding, Severity
-from .pipeline import AnalysisResult, analyze
+from .pipeline import AnalysisResult, analyze, prior_keys_from_dicts
 
 BaselineInput = Union[str, Path, Baseline]
 DiffInput = Union[str, Path, Diff]
 AnnotationsInput = Union[str, Path, list[FileAnnotation], None]
 FindingsInput = Union[str, Path, list[Finding], None]
+PriorInput = Union[str, Path, AnalysisResult, list, dict, None]
 
 
 def run_step(
@@ -38,6 +41,7 @@ def run_step(
     pr: str = "",
     llm: Optional[LLMClient] = None,
     max_hunk_chars: int = 4000,
+    prior: PriorInput = None,
 ) -> AnalysisResult:
     """Run the Threat-Model Delta step as one standalone pipeline function.
 
@@ -68,6 +72,7 @@ def run_step(
         client,
         pr=pr or df.pr,
         max_hunk_chars=max_hunk_chars,
+        prior_keys=_resolve_prior(prior),
     )
 
 
@@ -99,3 +104,22 @@ def _resolve_findings(findings: FindingsInput) -> list[Finding]:
     if isinstance(findings, (str, Path)):
         return load_findings(findings)
     return list(findings)
+
+
+def _resolve_prior(prior: PriorInput) -> Optional[set]:
+    """Resolve the optional prior-run input into a suppression key-set.
+
+    ``None`` -> ``None`` (report every delta). A path/list/dict/AnalysisResult is
+    reduced to the set of :func:`~threat_delta.pipeline.delta_key` tuples already
+    reported, so a re-run only surfaces what is new (incremental subtraction).
+    """
+    if prior is None:
+        return None
+    if isinstance(prior, AnalysisResult):
+        return prior_keys_from_dicts([d.to_dict() for d in prior.deltas])
+    if isinstance(prior, (str, Path)):
+        data = json.loads(Path(prior).read_text(encoding="utf-8"))
+    else:
+        data = prior
+    deltas = data.get("deltas", []) if isinstance(data, dict) else list(data)
+    return prior_keys_from_dicts(deltas)

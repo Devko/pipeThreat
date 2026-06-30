@@ -22,12 +22,19 @@ build. Severity is computed from facts, so it is stable across runs.
 ## Threat-Model Delta (advisory)
 
 ### High (1)
-- new_entry_point — comp.user_service  ⚠ needs human review
+- new_entry_point — affected: comp.user_service  ⚠ needs human review
+  - Change signals: new entry point, trust-boundary crossing
   - STRIDE: InformationDisclosure, ElevationOfPrivilege
-  - Contradicts assumption: asm.no_direct_internal_ingress
+  - Confidence: high
+  - Why high: new entry point on an internal component → High
   - New public HTTP handler on an internal service returns user PII without authz.
   - Recommended action: route through the gateway or add explicit authz + validation.
 ```
+
+Each finding folds a component's change-signals into one line (not one near-
+duplicate per signal), states *why* the severity is what it is, and reports a
+confidence that means something — `high` only when an independent static-analysis
+signal corroborates the model.
 
 ---
 
@@ -37,13 +44,35 @@ build. Severity is computed from facts, so it is stable across runs.
 |---|---|---|
 | **6a** `resolve_slice` | Match changed paths to baseline `code_paths`; build the relevant slice; flag untracked paths | deterministic |
 | **6b** `classify_change` | Coarse flags — is a new entry point / data flow / boundary crossing / asset change / control change plausibly in play? | 1 LLM call |
-| **6c** `stride_deltas` | Per affected component: which STRIDE categories does *this* change introduce or worsen? | N LLM calls |
-| **6d** `assumption_check` | Which stated assumptions does the diff violate or weaken? | 1 LLM call |
-| **6e** assemble + score + emit | Build scored deltas, dedupe, render SARIF + PR comment | deterministic |
+| **6c** `stride_deltas` | Per affected component: which STRIDE categories does *this* change introduce or worsen? Grounded with deterministic signals | N LLM calls |
+| **6d** `assumption_check` | Which stated assumptions does the diff violate or weaken? **One bounded call per assumption** (small models drop items when batched) | M LLM calls |
+| **6e** assemble + score + emit | Collapse each component's signals into one scored delta, dedupe, render SARIF + PR comment | deterministic |
 
 6b **gates** 6c and 6d: if every flag is false, the expensive calls are skipped and
-only deterministic `untracked_path` deltas remain. A typical PR is 3–5 short LLM
-calls — bounded and async, so it never holds up the merge.
+only deterministic `untracked_path` deltas remain. A typical PR is a handful of
+short, bounded calls (one classify, one per affected component, one per
+assumption) — async, so it never holds up the merge.
+
+### Signal quality
+
+Four deterministic mechanisms keep the small-model output trustworthy:
+
+- **Deterministic signals** — before 6c/6d, the pipeline scans the added lines and
+  the static-analysis annotations for grounding facts (entry points, untrusted
+  input → sink reach, missing auth/rate-limit/validation) and hands them to the
+  model as data. It judges facts, it doesn't imagine threats.
+- **Per-assumption fan-out** — 6d asks one narrow yes/no question per assumption.
+  Batching the whole list into one prompt is what makes small models silently drop
+  violations.
+- **Self-consistency voting** (`--votes N`, off by default) — sample each call N
+  times and keep only what a majority agrees on; the agreement fraction feeds
+  confidence.
+- **Meaningful confidence** — `high` only when an independent static-analysis
+  signal corroborates a confident finding; `low` on a split vote or model
+  uncertainty. Severity stays deterministic regardless.
+
+`--since <deltas.json>` runs incrementally: a re-run on the same PR suppresses
+deltas already reported and surfaces only what changed.
 
 ---
 
@@ -202,6 +231,8 @@ example shows tiered High + Medium in one report). The same machinery resolves
   STRIDE labels and unknown assumption ids are filtered.
 - **Injection-resistant** — diff and comment text is passed as data under labelled
   sections, never as instructions.
+- **Anchored output** — SARIF results carry the changed-line region, so findings
+  land as inline annotations on the PR diff, not just file-level.
 
 ---
 
@@ -214,6 +245,7 @@ threat_delta/
   baseline.py           load + index threat-model.yaml
   diff.py               parse diffs, annotations, findings
   relevance.py          6a — glob path matching → baseline slice
+  signals.py            deterministic grounding facts + hunk regions
   prompts.py            prompt templates (data-only, injection-resistant)
   classify.py           6b — change classification
   stride.py             6c — STRIDE deltas

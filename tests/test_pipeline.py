@@ -97,15 +97,14 @@ def _worked_example_llm():
                     {"stride": "Spoofing", "reason": "no caller authentication on new route"},
                 ]
             },
-            # 6d assumptions — keyed on a label present in that prompt only.
-            "does this change violate or weaken it": {
-                "violations": [
-                    {"assumption_id": "asm.no_direct_internal_ingress", "violated": True,
-                     "reason": "internal service now has a public entry point"},
-                    {"assumption_id": "asm.edge_validation", "violated": True,
-                     "reason": "input no longer guaranteed to transit gateway validation"},
-                ]
-            },
+            # 6d assumptions — fanned out one call per assumption, keyed on the
+            # assumption id echoed in each single-assumption prompt.
+            "asm.no_direct_internal_ingress": {
+                "assumption_id": "asm.no_direct_internal_ingress", "violated": True,
+                "reason": "internal service now has a public entry point"},
+            "asm.edge_validation": {
+                "assumption_id": "asm.edge_validation", "violated": True,
+                "reason": "input no longer guaranteed to transit gateway validation"},
         },
         default={},
     )

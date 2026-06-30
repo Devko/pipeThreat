@@ -226,6 +226,9 @@ class StrideDelta:
     stride: Stride
     reason: str
     low_confidence: bool = False
+    # Fraction of self-consistency votes that surfaced this category (1.0 when
+    # voting is off). Feeds the confidence rule.
+    agreement: float = 1.0
 
 
 @dataclass
@@ -235,6 +238,8 @@ class Violation:
     violated: bool
     reason: str
     low_confidence: bool = False
+    # Fraction of self-consistency votes that judged this assumption violated.
+    agreement: float = 1.0
 
 
 @dataclass
@@ -264,6 +269,13 @@ class Delta:
     evidence: dict = field(default_factory=dict)
     proposed_baseline_update: Optional[ProposedBaselineUpdate] = None
     low_confidence: bool = False
+    # One-line, deterministic explanation of *why* this severity (which asset
+    # sensitivity / trust zone / rule drove it) — see severity.severity_rationale.
+    severity_rationale: str = ""
+    # Human labels for the change-signals folded into a collapsed component delta
+    # (e.g. ["new entry point", "trust-boundary crossing"]). Empty for the
+    # single-signal delta types (untracked_path, assumption_violation).
+    change_signals: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         d = {
@@ -280,6 +292,10 @@ class Delta:
             "recommended_action": self.recommended_action,
             "requires_human_review": self.requires_human_review,
         }
+        if self.severity_rationale:
+            d["severity_rationale"] = self.severity_rationale
+        if self.change_signals:
+            d["change_signals"] = list(self.change_signals)
         if self.proposed_baseline_update is not None:
             d["proposed_baseline_update"] = self.proposed_baseline_update.to_dict()
         if self.low_confidence:

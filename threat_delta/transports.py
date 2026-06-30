@@ -90,14 +90,16 @@ class OpenAICompatibleClient(LLMClient):
             return "medium"
         return "high"
 
-    def _build_body(self, system: str, prompt: str, *, reasoning_budget: int) -> dict:
+    def _build_body(
+        self, system: str, prompt: str, *, reasoning_budget: int, temperature: float | None = None
+    ) -> dict:
         body: dict = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},
             ],
-            "temperature": self.config.temperature,
+            "temperature": self.config.temperature if temperature is None else temperature,
             "max_tokens": self.config.max_tokens,
             "stream": False,
         }
@@ -126,7 +128,12 @@ class OpenAICompatibleClient(LLMClient):
             raise LLMError(f"LLM returned non-JSON HTTP response: {exc}") from exc
 
     def _raw_complete(
-        self, system: str, prompt: str, *, stage: str | None = None
+        self,
+        system: str,
+        prompt: str,
+        *,
+        stage: str | None = None,
+        temperature: float | None = None,
     ) -> str:
         headers = {
             "Content-Type": "application/json",
@@ -136,7 +143,9 @@ class OpenAICompatibleClient(LLMClient):
 
         budget = self.config.budget_for(stage) if self._reasoning_enabled else 0
         sent_reasoning = budget > 0
-        payload = json.dumps(self._build_body(system, prompt, reasoning_budget=budget))
+        payload = json.dumps(
+            self._build_body(system, prompt, reasoning_budget=budget, temperature=temperature)
+        )
 
         try:
             raw = self.http_post(url, headers, payload.encode("utf-8"), self.config.timeout_s)
@@ -146,7 +155,9 @@ class OpenAICompatibleClient(LLMClient):
             # the model doesn't support it. Disable it for this client and retry.
             if exc.code == 400 and sent_reasoning:
                 self._reasoning_enabled = False
-                retry = json.dumps(self._build_body(system, prompt, reasoning_budget=0))
+                retry = json.dumps(
+                    self._build_body(system, prompt, reasoning_budget=0, temperature=temperature)
+                )
                 try:
                     raw = self.http_post(
                         url, headers, retry.encode("utf-8"), self.config.timeout_s
@@ -217,7 +228,12 @@ class OllamaClient(OpenAICompatibleClient):
         return base[:-3] if base.endswith("/v1") else base
 
     def _raw_complete(
-        self, system: str, prompt: str, *, stage: str | None = None
+        self,
+        system: str,
+        prompt: str,
+        *,
+        stage: str | None = None,
+        temperature: float | None = None,
     ) -> str:
         """Use Ollama's native ``/api/chat`` endpoint.
 
@@ -236,7 +252,9 @@ class OllamaClient(OpenAICompatibleClient):
             "stream": False,
             "think": think,
             "options": {
-                "temperature": self.config.temperature,
+                "temperature": (
+                    self.config.temperature if temperature is None else temperature
+                ),
                 "num_predict": self.config.max_tokens,
             },
         }

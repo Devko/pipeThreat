@@ -57,25 +57,22 @@ SCRIPTED_MODEL = ScriptedLLMClient(
                 },
             ]
         },
-        # 6d — assumption contradictions.
-        "does this change violate or weaken it?": {
-            "violations": [
-                {
-                    "assumption_id": "asm.all_requests_authenticated",
-                    "violated": True,
-                    "reason": "new endpoint requires no token",
-                },
-                {
-                    "assumption_id": "asm.acl_enforced",
-                    "violated": True,
-                    "reason": "reads storage directly with no ACL policy evaluation",
-                },
-                {
-                    "assumption_id": "asm.all_access_audited",
-                    "violated": True,
-                    "reason": "returns secret data without writing an audit entry",
-                },
-            ]
+        # 6d — assumption contradictions, fanned out one call per assumption and
+        # keyed on the assumption id echoed in each single-assumption prompt.
+        "asm.all_requests_authenticated": {
+            "assumption_id": "asm.all_requests_authenticated",
+            "violated": True,
+            "reason": "new endpoint requires no token",
+        },
+        "asm.acl_enforced": {
+            "assumption_id": "asm.acl_enforced",
+            "violated": True,
+            "reason": "reads storage directly with no ACL policy evaluation",
+        },
+        "asm.all_access_audited": {
+            "assumption_id": "asm.all_access_audited",
+            "violated": True,
+            "reason": "returns secret data without writing an audit entry",
         },
     },
     default={},

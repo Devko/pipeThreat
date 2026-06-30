@@ -50,7 +50,8 @@ at the system level*.
   `asm.user_scoped_access` (arbitrary `user_id`).
 - **6e (score):** severity is **High** deterministically — the component handles a
   `critical` asset and the change violates assumptions guarding sensitive assets.
-  Five deltas, all `requires_human_review: true`, each with a
+  Four deltas (three assumption violations + one collapsed component delta that
+  lists both change-signals), all `requires_human_review: true`, each with a
   `proposed_baseline_update`.
 
 ## Reproduce it

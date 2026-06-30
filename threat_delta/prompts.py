@@ -145,7 +145,20 @@ def _positive_flag_names(flags: Flags) -> list[str]:
     return names
 
 
-def stride_prompt(component: Component, hunk_text: str, flags: Flags) -> str:
+def _signals_section(signals: list[str] | None) -> str:
+    """Optional labelled data block of deterministic grounding facts (6c/6d)."""
+    if not signals:
+        return ""
+    body = "\n".join(f"- {s}" for s in signals)
+    return f"Deterministic signals (facts from static analysis):\n{body}\n\n"
+
+
+def stride_prompt(
+    component: Component,
+    hunk_text: str,
+    flags: Flags,
+    signals: list[str] | None = None,
+) -> str:
     """6c — per-component STRIDE delta prompt body."""
     return (
         f"Component: {component.id} (zone: {component.trust_zone}, "
@@ -153,6 +166,7 @@ def stride_prompt(component: Component, hunk_text: str, flags: Flags) -> str:
         f"entry points: {_fmt_list(component.entry_points)})\n"
         f"Positive change flags: {_fmt_list(_positive_flag_names(flags))}\n"
         "\n"
+        f"{_signals_section(signals)}"
         "Relevant code change:\n"
         f"{hunk_text}\n"
         "\n"
@@ -168,8 +182,9 @@ def assumption_prompt(
     assumptions: list[Assumption],
     diff: Diff,
     annotations: list[FileAnnotation],
+    signals: list[str] | None = None,
 ) -> str:
-    """6d — assumption-violation prompt body."""
+    """6d — batched assumption-violation prompt body (all assumptions at once)."""
     return (
         "Stated security assumptions:\n"
         f"{format_assumptions(assumptions)}\n"
@@ -177,10 +192,42 @@ def assumption_prompt(
         "Changed entry points / inputs / sinks:\n"
         f"{format_annotations(annotations)}\n"
         "\n"
+        f"{_signals_section(signals)}"
         "Diff summary:\n"
         f"{format_diff_summary(diff)}\n"
         "\n"
         "For each assumption, does this change violate or weaken it?\n"
         'Output JSON: {"violations":[{"assumption_id":"...","violated":bool,'
         '"reason":"<=20 words"}]}  (include only violated:true entries)'
+    )
+
+
+def assumption_prompt_single(
+    assumption: Assumption,
+    diff: Diff,
+    annotations: list[FileAnnotation],
+    signals: list[str] | None = None,
+) -> str:
+    """6d — single-assumption prompt body (one bounded call per assumption).
+
+    Fanning out one assumption per call keeps the question narrow, which a small
+    local model answers far more reliably than a batched "judge this whole list"
+    prompt (batching silently drops items). The assumption id is echoed back so a
+    deterministic stub can key on it.
+    """
+    return (
+        f"Stated security assumption:\n{assumption.id}: {assumption.statement}\n"
+        "\n"
+        "Changed entry points / inputs / sinks:\n"
+        f"{format_annotations(annotations)}\n"
+        "\n"
+        f"{_signals_section(signals)}"
+        "Diff summary:\n"
+        f"{format_diff_summary(diff)}\n"
+        "\n"
+        f"Considering ONLY assumption '{assumption.id}', does this change violate "
+        "or weaken it?\n"
+        'Output JSON: {"assumption_id":"'
+        f"{assumption.id}"
+        '","violated":bool,"reason":"<=20 words"}'
     )

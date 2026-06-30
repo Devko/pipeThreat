@@ -16,6 +16,11 @@ from __future__ import annotations
 from .models import Asset, Confidence, DeltaType, Sensitivity, Severity
 
 
+def _most_sensitive(assets: list[Asset]) -> Asset | None:
+    order = {Sensitivity.CRITICAL: 3, Sensitivity.HIGH: 2, Sensitivity.MEDIUM: 1, Sensitivity.LOW: 0}
+    return max(assets, key=lambda a: order[a.sensitivity], default=None)
+
+
 # --------------------------------------------------------------------------- #
 # Asset floor
 # --------------------------------------------------------------------------- #
@@ -100,3 +105,80 @@ def confidence_from_flags(low_confidence: bool) -> Confidence:
     surfaced: LOW when the model was unsure, else MEDIUM.
     """
     return Confidence.LOW if low_confidence else Confidence.MEDIUM
+
+
+def confidence_from_evidence(
+    *,
+    low_confidence: bool,
+    corroborated: bool,
+    agreement: float = 1.0,
+) -> Confidence:
+    """Confidence from real signal, not a flat constant (spec §7).
+
+    Confidence still never alters severity. It now reflects two facts the
+    pipeline actually has:
+
+    * ``agreement`` — the fraction of self-consistency votes that produced this
+      item (1.0 when voting is off); below 0.6 we are not confident.
+    * ``corroborated`` — an independent static-analysis annotation or a
+      SAST/secret finding touches the same file.
+
+    LOW when the model flagged ``low_confidence`` or the vote was split; HIGH
+    when an independent source corroborates a confident finding; else MEDIUM.
+    """
+    if low_confidence or agreement < 0.6:
+        return Confidence.LOW
+    if corroborated and agreement >= 0.99:
+        return Confidence.HIGH
+    return Confidence.MEDIUM
+
+
+# --------------------------------------------------------------------------- #
+# Severity rationale (why this level — auditable, deterministic)
+# --------------------------------------------------------------------------- #
+
+def severity_rationale(
+    *,
+    delta_type: DeltaType,
+    severity: Severity,
+    affected_assets: list[Asset],
+    into_internal_zone: bool = False,
+    new_internal_entry_point: bool = False,
+    assumption_guards_sensitive: bool = False,
+    weakens_control: bool = False,
+    untracked_in_finding: bool = False,
+) -> str:
+    """One line explaining which §7 rule set this severity.
+
+    Mirrors :func:`compute_severity`; names the dominant reason so a reviewer can
+    audit the level instead of taking it on faith.
+    """
+    asset = _most_sensitive(affected_assets)
+    if (
+        delta_type == DeltaType.ASSUMPTION_VIOLATION
+        and assumption_guards_sensitive
+        and asset is not None
+    ):
+        return (
+            f"assumption guards `{asset.id}` "
+            f"({asset.sensitivity.value}-sensitivity) → High"
+        )
+    if delta_type == DeltaType.TRUST_BOUNDARY_CROSSING and into_internal_zone:
+        return "crosses into an internal trust zone → High"
+    if delta_type == DeltaType.NEW_ENTRY_POINT and new_internal_entry_point:
+        return "new entry point on an internal component → High"
+    if asset is not None and asset.sensitivity in (Sensitivity.CRITICAL, Sensitivity.HIGH):
+        floor = "High" if asset.sensitivity == Sensitivity.CRITICAL else "Medium"
+        return (
+            f"touches `{asset.id}` ({asset.sensitivity.value}-sensitivity) "
+            f"→ at least {floor}"
+        )
+    if delta_type == DeltaType.CONTROL_CHANGE and weakens_control:
+        return "weakens or removes a listed control → at least Medium"
+    if delta_type == DeltaType.UNTRACKED_PATH:
+        return (
+            "untracked path also appears in a SAST/secret finding → Medium"
+            if untracked_in_finding
+            else "untracked path (baseline drift) → Low"
+        )
+    return f"no sensitivity-raising rule matched → {severity.value.capitalize()}"

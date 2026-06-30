@@ -66,6 +66,13 @@ class LLMConfig:
     # Generous default: a ~4B model on a cold CPU runner can take minutes for the
     # first inference (model load + generation).
     timeout_s: float = 300.0
+    # Self-consistency voting: sample each narrow call ``votes`` times and keep
+    # what the majority agrees on (see the stage reducers). Default 1 = off (one
+    # call, no extra wall-clock); >1 trades CPU time for recall/precision and is
+    # most useful on the smallest models. Extra samples use ``vote_temperature``
+    # so they actually diverge (the first sample stays at ``temperature``).
+    votes: int = 1
+    vote_temperature: float = 0.4
 
     def budget_for(self, stage: str | None) -> int:
         """Reasoning-token budget for ``stage`` (0 when reasoning is disabled)."""
@@ -83,12 +90,21 @@ class LLMClient(ABC):
         self.config = config or LLMConfig()
 
     @abstractmethod
-    def _raw_complete(self, system: str, prompt: str, *, stage: str | None = None) -> str:
+    def _raw_complete(
+        self,
+        system: str,
+        prompt: str,
+        *,
+        stage: str | None = None,
+        temperature: float | None = None,
+    ) -> str:
         """Return the model's raw text for ``system`` + ``prompt``.
 
         ``stage`` (one of ``"classify"``/``"stride"``/``"assumptions"``) lets a
         transport pick the per-stage reasoning budget via
-        :meth:`LLMConfig.budget_for`.
+        :meth:`LLMConfig.budget_for`. ``temperature`` overrides
+        ``config.temperature`` for one call (used by self-consistency voting so
+        the extra samples diverge); ``None`` means "use the configured value".
         """
 
     def complete_json(
@@ -98,6 +114,7 @@ class LLMClient(ABC):
         system: str = SYSTEM_PREAMBLE,
         stage: str | None = None,
         prefer_keys: tuple[str, ...] = (),
+        temperature: float | None = None,
     ) -> dict:
         """Run one call and return the parsed JSON object.
 
@@ -106,8 +123,45 @@ class LLMClient(ABC):
         answer object usually contains one of these keys and comes last). Raises
         :class:`LLMError` if no JSON object can be recovered.
         """
-        raw = self._raw_complete(system, prompt, stage=stage)
+        raw = self._raw_complete(system, prompt, stage=stage, temperature=temperature)
         return parse_json_object(raw, prefer_keys=prefer_keys)
+
+    def complete_json_samples(
+        self,
+        prompt: str,
+        *,
+        system: str = SYSTEM_PREAMBLE,
+        stage: str | None = None,
+        prefer_keys: tuple[str, ...] = (),
+    ) -> list[dict]:
+        """Run ``config.votes`` samples and return every parsed object.
+
+        Sample 0 uses ``config.temperature`` (the deterministic answer); any
+        further samples use ``config.vote_temperature`` so they can diverge. A
+        sample whose output cannot be parsed is dropped; the call raises
+        :class:`LLMError` only if *every* sample fails. The stage reducers turn
+        the returned list into a majority decision.
+        """
+        votes = max(1, int(self.config.votes))
+        out: list[dict] = []
+        last_error: LLMError | None = None
+        for i in range(votes):
+            temperature = None if i == 0 else self.config.vote_temperature
+            try:
+                out.append(
+                    self.complete_json(
+                        prompt,
+                        system=system,
+                        stage=stage,
+                        prefer_keys=prefer_keys,
+                        temperature=temperature,
+                    )
+                )
+            except LLMError as exc:
+                last_error = exc
+        if not out:
+            raise last_error or LLMError("no usable sample from the model")
+        return out
 
 
 def parse_json_object(text: str, *, prefer_keys: tuple[str, ...] = ()) -> dict:
@@ -219,7 +273,16 @@ class ScriptedLLMClient(LLMClient):
         self.calls: list[str] = []
         self.stages: list[str | None] = []
 
-    def _raw_complete(self, system: str, prompt: str, *, stage: str | None = None) -> str:
+    def _raw_complete(
+        self,
+        system: str,
+        prompt: str,
+        *,
+        stage: str | None = None,
+        temperature: float | None = None,
+    ) -> str:
+        # Deterministic: ``temperature`` is accepted (so voting works) but
+        # ignored — a scripted client always returns the same canned answer.
         self.calls.append(prompt)
         self.stages.append(stage)
         for tag, payload in self.responses.items():

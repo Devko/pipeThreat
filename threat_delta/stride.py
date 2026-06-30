@@ -92,36 +92,13 @@ def _concat_hunks(hunks: list[Hunk], max_hunk_chars: int) -> str:
     return text
 
 
-def stride_deltas(
-    component: Component,
-    hunks: list[Hunk],
-    flags: Flags,
-    llm: LLMClient,
-    *,
-    max_hunk_chars: int = 4000,
-) -> list[StrideDelta]:
-    """6c — STRIDE deltas this change introduces/worsens for ``component``.
-
-    Returns ``[]`` immediately when no flag is positive (nothing for 6c to do).
-    Otherwise builds the per-component prompt with a capped hunk body, runs one
-    JSON completion, and parses the ``{"deltas": [...]}`` list into
-    :class:`StrideDelta` objects. Entries whose ``stride`` is not a valid
-    :class:`Stride` value are skipped. A top-level ``"low_confidence": true``
-    propagates to every produced delta.
-    """
-    if not flags.any_positive:
-        return []
-
-    hunk_text = _concat_hunks(hunks, max_hunk_chars)
-    prompt = prompts.stride_prompt(component, hunk_text, flags)
-    result = llm.complete_json(prompt, stage="stride", prefer_keys=("deltas",))
-
+def _parse_sample(result: dict) -> tuple[list[tuple[Stride, str]], bool]:
+    """Parse one sample into ``[(stride, reason), ...]`` plus its low-conf flag."""
     low_confidence = bool(result.get("low_confidence", False))
     raw_deltas = result.get("deltas", [])
     if not isinstance(raw_deltas, list):
-        return []
-
-    deltas: list[StrideDelta] = []
+        return [], low_confidence
+    out: list[tuple[Stride, str]] = []
     for item in raw_deltas:
         if not isinstance(item, dict):
             continue
@@ -130,11 +107,69 @@ def stride_deltas(
             # Hallucination guard: unrecognized STRIDE label -> drop the entry.
             continue
         reason = str(item.get("reason", "")).strip()[:_MAX_REASON_CHARS]
+        out.append((stride, reason))
+    return out, low_confidence
+
+
+def stride_deltas(
+    component: Component,
+    hunks: list[Hunk],
+    flags: Flags,
+    llm: LLMClient,
+    *,
+    max_hunk_chars: int = 4000,
+    signals: list[str] | None = None,
+) -> list[StrideDelta]:
+    """6c — STRIDE deltas this change introduces/worsens for ``component``.
+
+    Returns ``[]`` immediately when no flag is positive (nothing for 6c to do).
+    Otherwise builds the per-component prompt (with a capped hunk body and the
+    deterministic ``signals`` block), runs ``config.votes`` samples and keeps a
+    STRIDE category when a **majority** of samples surfaced it. Each kept delta
+    records the vote ``agreement`` (1.0 when voting is off); entries whose
+    ``stride`` is not a valid :class:`Stride` value are dropped (hallucination
+    guard).
+    """
+    if not flags.any_positive:
+        return []
+
+    hunk_text = _concat_hunks(hunks, max_hunk_chars)
+    prompt = prompts.stride_prompt(component, hunk_text, flags, signals=signals)
+    samples = llm.complete_json_samples(prompt, stage="stride", prefer_keys=("deltas",))
+
+    n = len(samples)
+    majority = n // 2 + 1
+    # Tally votes per STRIDE category, preserving first-seen order; keep the
+    # first non-empty reason seen for each.
+    counts: dict[Stride, int] = {}
+    reasons: dict[Stride, str] = {}
+    order: list[Stride] = []
+    any_low_conf = False
+    for result in samples:
+        parsed, low_conf = _parse_sample(result)
+        any_low_conf = any_low_conf or low_conf
+        seen_in_sample: set[Stride] = set()
+        for stride, reason in parsed:
+            if stride not in counts:
+                counts[stride] = 0
+                order.append(stride)
+            if stride not in seen_in_sample:
+                counts[stride] += 1
+                seen_in_sample.add(stride)
+            if reason and not reasons.get(stride):
+                reasons[stride] = reason
+
+    deltas: list[StrideDelta] = []
+    for stride in order:
+        if counts[stride] < majority:
+            continue  # not enough agreement across votes
+        agreement = counts[stride] / n
         deltas.append(
             StrideDelta(
                 stride=stride,
-                reason=reason,
-                low_confidence=low_confidence,
+                reason=reasons.get(stride, ""),
+                low_confidence=any_low_conf or agreement < 1.0,
+                agreement=agreement,
             )
         )
     return deltas

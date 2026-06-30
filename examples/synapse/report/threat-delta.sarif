@@ -9,17 +9,6 @@
           "informationUri": "https://github.com/Devko/pipeThreat",
           "rules": [
             {
-              "id": "asset_exposure",
-              "name": "AssetExposure",
-              "shortDescription": {
-                "text": "asset exposure"
-              },
-              "defaultConfiguration": {
-                "level": "warning"
-              },
-              "helpUri": "https://github.com/Devko/pipeThreat/blob/main/docs/deltas.md#asset_exposure"
-            },
-            {
               "id": "assumption_violation",
               "name": "AssumptionViolation",
               "shortDescription": {
@@ -46,45 +35,6 @@
       },
       "results": [
         {
-          "ruleId": "asset_exposure",
-          "level": "warning",
-          "message": {
-            "text": "Asset-handling change on Client-Server REST API (edge zone). STRIDE: InformationDisclosure: returns any user's account data and messages without authorization; ElevationOfPrivilege: non-admin caller reads arbitrary users' data by id; Spoofing: user_id read from query string, not bound to an authenticated caller"
-          },
-          "locations": [
-            {
-              "physicalLocation": {
-                "artifactLocation": {
-                  "uri": "synapse/rest/client/account_export.py"
-                }
-              }
-            }
-          ],
-          "partialFingerprints": {
-            "deltaId": "td-17421-1"
-          },
-          "properties": {
-            "severity": "high",
-            "confidence": "medium",
-            "stride": [
-              "InformationDisclosure",
-              "ElevationOfPrivilege",
-              "Spoofing"
-            ],
-            "contradicts_assumption": null,
-            "requires_human_review": true,
-            "affected_elements": [
-              "comp.client_api"
-            ],
-            "recommended_action": "Confirm the asset exposure is intended; verify access controls and that sensitive data is not newly disclosed.",
-            "proposed_baseline_update": {
-              "kind": "component_asset_handling_changed",
-              "target": "comp.client_api",
-              "change": "review handles_assets for comp.client_api"
-            }
-          }
-        },
-        {
           "ruleId": "assumption_violation",
           "level": "warning",
           "message": {
@@ -95,16 +45,19 @@
               "physicalLocation": {
                 "artifactLocation": {
                   "uri": "synapse/rest/client/account_export.py"
+                },
+                "region": {
+                  "startLine": 1
                 }
               }
             }
           ],
           "partialFingerprints": {
-            "deltaId": "td-17421-2"
+            "deltaId": "td-17421-1"
           },
           "properties": {
             "severity": "high",
-            "confidence": "medium",
+            "confidence": "high",
             "stride": [],
             "contradicts_assumption": "asm.admin_requires_admin",
             "requires_human_review": true,
@@ -112,6 +65,7 @@
               "comp.client_api"
             ],
             "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+            "severity_rationale": "assumption guards `asset.access_token` (critical-sensitivity) \u2192 High",
             "proposed_baseline_update": {
               "kind": "assumption_revisited",
               "target": "asm.admin_requires_admin",
@@ -130,16 +84,19 @@
               "physicalLocation": {
                 "artifactLocation": {
                   "uri": "synapse/rest/client/account_export.py"
+                },
+                "region": {
+                  "startLine": 1
                 }
               }
             }
           ],
           "partialFingerprints": {
-            "deltaId": "td-17421-3"
+            "deltaId": "td-17421-2"
           },
           "properties": {
             "severity": "high",
-            "confidence": "medium",
+            "confidence": "high",
             "stride": [],
             "contradicts_assumption": "asm.client_requires_token",
             "requires_human_review": true,
@@ -147,6 +104,7 @@
               "comp.client_api"
             ],
             "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+            "severity_rationale": "assumption guards `asset.access_token` (critical-sensitivity) \u2192 High",
             "proposed_baseline_update": {
               "kind": "assumption_revisited",
               "target": "asm.client_requires_token",
@@ -165,16 +123,19 @@
               "physicalLocation": {
                 "artifactLocation": {
                   "uri": "synapse/rest/client/account_export.py"
+                },
+                "region": {
+                  "startLine": 1
                 }
               }
             }
           ],
           "partialFingerprints": {
-            "deltaId": "td-17421-4"
+            "deltaId": "td-17421-3"
           },
           "properties": {
             "severity": "high",
-            "confidence": "medium",
+            "confidence": "high",
             "stride": [],
             "contradicts_assumption": "asm.user_scoped_access",
             "requires_human_review": true,
@@ -182,6 +143,7 @@
               "comp.client_api"
             ],
             "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+            "severity_rationale": "assumption guards `asset.access_token` (critical-sensitivity) \u2192 High",
             "proposed_baseline_update": {
               "kind": "assumption_revisited",
               "target": "asm.user_scoped_access",
@@ -193,23 +155,26 @@
           "ruleId": "new_entry_point",
           "level": "warning",
           "message": {
-            "text": "New entry point on Client-Server REST API (edge zone). STRIDE: InformationDisclosure: returns any user's account data and messages without authorization; ElevationOfPrivilege: non-admin caller reads arbitrary users' data by id; Spoofing: user_id read from query string, not bound to an authenticated caller"
+            "text": "2 change-signals on Client-Server REST API (edge zone): new entry point, asset-handling change. STRIDE: InformationDisclosure: returns any user's account data and messages without authorization; ElevationOfPrivilege: non-admin caller reads arbitrary users' data by id; Spoofing: user_id read from query string, not bound to an authenticated caller"
           },
           "locations": [
             {
               "physicalLocation": {
                 "artifactLocation": {
                   "uri": "synapse/rest/client/account_export.py"
+                },
+                "region": {
+                  "startLine": 1
                 }
               }
             }
           ],
           "partialFingerprints": {
-            "deltaId": "td-17421-5"
+            "deltaId": "td-17421-4"
           },
           "properties": {
             "severity": "high",
-            "confidence": "medium",
+            "confidence": "high",
             "stride": [
               "InformationDisclosure",
               "ElevationOfPrivilege",
@@ -221,10 +186,15 @@
               "comp.client_api"
             ],
             "recommended_action": "Confirm the new entry point is intended; add explicit authz + input validation, or route it through the gateway.",
+            "severity_rationale": "touches `asset.access_token` (critical-sensitivity) \u2192 at least High",
+            "change_signals": [
+              "new entry point",
+              "asset-handling change"
+            ],
             "proposed_baseline_update": {
               "kind": "component_entry_point_added",
               "target": "comp.client_api",
-              "change": "entry_points += http_client_api"
+              "change": "entry_points += http_client_api; review handles_assets"
             }
           }
         }

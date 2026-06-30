@@ -57,25 +57,22 @@ SCRIPTED_MODEL = ScriptedLLMClient(
                 },
             ]
         },
-        # 6d — assumption contradictions.
-        "does this change violate or weaken it?": {
-            "violations": [
-                {
-                    "assumption_id": "asm.client_requires_token",
-                    "violated": True,
-                    "reason": "new client endpoint mounted with no access-token check",
-                },
-                {
-                    "assumption_id": "asm.admin_requires_admin",
-                    "violated": True,
-                    "reason": "returns another user's data without a server-admin token",
-                },
-                {
-                    "assumption_id": "asm.user_scoped_access",
-                    "violated": True,
-                    "reason": "reads an arbitrary user_id instead of the authenticated user",
-                },
-            ]
+        # 6d — assumption contradictions, fanned out one call per assumption and
+        # keyed on the assumption id echoed in each single-assumption prompt.
+        "asm.client_requires_token": {
+            "assumption_id": "asm.client_requires_token",
+            "violated": True,
+            "reason": "new client endpoint mounted with no access-token check",
+        },
+        "asm.admin_requires_admin": {
+            "assumption_id": "asm.admin_requires_admin",
+            "violated": True,
+            "reason": "returns another user's data without a server-admin token",
+        },
+        "asm.user_scoped_access": {
+            "assumption_id": "asm.user_scoped_access",
+            "violated": True,
+            "reason": "reads an arbitrary user_id instead of the authenticated user",
         },
     },
     default={},

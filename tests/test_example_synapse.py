@@ -10,7 +10,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-from threat_delta.models import DeltaType, Severity
+from threat_delta.models import Confidence, DeltaType, Severity
 from threat_delta.validate import has_errors, validate_file
 
 _SAMPLE = Path(__file__).resolve().parent.parent / "examples" / "synapse"
@@ -33,15 +33,25 @@ def test_sample_report_is_high_severity():
     result = _load_generator().build_result()
 
     assert result.pr == "17421"
-    assert len(result.deltas) == 5
+    # Three assumption violations + one collapsed component delta (the per-flag
+    # deltas are folded into a single component finding).
+    assert len(result.deltas) == 4
     # Every delta is High and needs human review.
     assert all(d.severity == Severity.HIGH for d in result.deltas)
     assert all(d.requires_human_review for d in result.deltas)
 
     types = {d.type for d in result.deltas}
     assert DeltaType.NEW_ENTRY_POINT in types
-    assert DeltaType.ASSET_EXPOSURE in types
     assert DeltaType.ASSUMPTION_VIOLATION in types
+
+    # The collapsed component delta lists every change-signal (incl. the
+    # asset-handling change that is no longer its own delta) and is corroborated
+    # by static analysis, so confidence is high.
+    component = next(d for d in result.deltas if d.type == DeltaType.NEW_ENTRY_POINT)
+    assert "asset-handling change" in component.change_signals
+    assert "new entry point" in component.change_signals
+    assert component.confidence == Confidence.HIGH
+    assert component.severity_rationale
 
     # The three stated assumptions are all flagged.
     contradicted = {

@@ -32,14 +32,19 @@ def test_sample_report_is_high_severity_with_repudiation():
     result = _load_generator().build_result()
 
     assert result.pr == "29101"
-    assert len(result.deltas) == 6
+    # Three assumption violations + one collapsed component delta.
+    assert len(result.deltas) == 4
     assert all(d.severity == Severity.HIGH for d in result.deltas)
     assert all(d.requires_human_review for d in result.deltas)
 
     types = {d.type for d in result.deltas}
     assert DeltaType.NEW_ENTRY_POINT in types
-    assert DeltaType.TRUST_BOUNDARY_CROSSING in types
     assert DeltaType.ASSUMPTION_VIOLATION in types
+
+    # The trust-boundary crossing is folded into the collapsed component delta's
+    # change-signals rather than being its own near-duplicate finding.
+    component = next(d for d in result.deltas if d.type == DeltaType.NEW_ENTRY_POINT)
+    assert "trust-boundary crossing" in component.change_signals
 
     # The audit bypass should surface as Repudiation somewhere in the STRIDE set.
     all_stride = {s for d in result.deltas for s in d.stride}

@@ -4,33 +4,33 @@
     {
       "delta_id": "td-17421-1",
       "pr": "17421",
-      "type": "asset_exposure",
+      "type": "assumption_violation",
       "affected_elements": [
         "comp.client_api"
       ],
-      "stride": [
-        "InformationDisclosure",
-        "ElevationOfPrivilege",
-        "Spoofing"
-      ],
-      "contradicts_assumption": null,
+      "stride": [],
+      "contradicts_assumption": "asm.admin_requires_admin",
       "severity": "high",
-      "confidence": "medium",
+      "confidence": "high",
       "evidence": {
         "files": [
           "synapse/rest/client/account_export.py"
         ],
         "entry_points": [
           "http_client_api"
-        ]
+        ],
+        "regions": {
+          "synapse/rest/client/account_export.py": 1
+        }
       },
-      "description": "Asset-handling change on Client-Server REST API (edge zone). STRIDE: InformationDisclosure: returns any user's account data and messages without authorization; ElevationOfPrivilege: non-admin caller reads arbitrary users' data by id; Spoofing: user_id read from query string, not bound to an authenticated caller",
-      "recommended_action": "Confirm the asset exposure is intended; verify access controls and that sensitive data is not newly disclosed.",
+      "description": "Change weakens or violates assumption 'asm.admin_requires_admin': returns another user's data without a server-admin token",
+      "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
       "requires_human_review": true,
+      "severity_rationale": "assumption guards `asset.access_token` (critical-sensitivity) \u2192 High",
       "proposed_baseline_update": {
-        "kind": "component_asset_handling_changed",
-        "target": "comp.client_api",
-        "change": "review handles_assets for comp.client_api"
+        "kind": "assumption_revisited",
+        "target": "asm.admin_requires_admin",
+        "change": "confirm intended; update or reaffirm the assumption"
       }
     },
     {
@@ -41,23 +41,27 @@
         "comp.client_api"
       ],
       "stride": [],
-      "contradicts_assumption": "asm.admin_requires_admin",
+      "contradicts_assumption": "asm.client_requires_token",
       "severity": "high",
-      "confidence": "medium",
+      "confidence": "high",
       "evidence": {
         "files": [
           "synapse/rest/client/account_export.py"
         ],
         "entry_points": [
           "http_client_api"
-        ]
+        ],
+        "regions": {
+          "synapse/rest/client/account_export.py": 1
+        }
       },
-      "description": "Change weakens or violates assumption 'asm.admin_requires_admin': returns another user's data without a server-admin token",
+      "description": "Change weakens or violates assumption 'asm.client_requires_token': new client endpoint mounted with no access-token check",
       "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
       "requires_human_review": true,
+      "severity_rationale": "assumption guards `asset.access_token` (critical-sensitivity) \u2192 High",
       "proposed_baseline_update": {
         "kind": "assumption_revisited",
-        "target": "asm.admin_requires_admin",
+        "target": "asm.client_requires_token",
         "change": "confirm intended; update or reaffirm the assumption"
       }
     },
@@ -69,48 +73,24 @@
         "comp.client_api"
       ],
       "stride": [],
-      "contradicts_assumption": "asm.client_requires_token",
-      "severity": "high",
-      "confidence": "medium",
-      "evidence": {
-        "files": [
-          "synapse/rest/client/account_export.py"
-        ],
-        "entry_points": [
-          "http_client_api"
-        ]
-      },
-      "description": "Change weakens or violates assumption 'asm.client_requires_token': new client endpoint mounted with no access-token check",
-      "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
-      "requires_human_review": true,
-      "proposed_baseline_update": {
-        "kind": "assumption_revisited",
-        "target": "asm.client_requires_token",
-        "change": "confirm intended; update or reaffirm the assumption"
-      }
-    },
-    {
-      "delta_id": "td-17421-4",
-      "pr": "17421",
-      "type": "assumption_violation",
-      "affected_elements": [
-        "comp.client_api"
-      ],
-      "stride": [],
       "contradicts_assumption": "asm.user_scoped_access",
       "severity": "high",
-      "confidence": "medium",
+      "confidence": "high",
       "evidence": {
         "files": [
           "synapse/rest/client/account_export.py"
         ],
         "entry_points": [
           "http_client_api"
-        ]
+        ],
+        "regions": {
+          "synapse/rest/client/account_export.py": 1
+        }
       },
       "description": "Change weakens or violates assumption 'asm.user_scoped_access': reads an arbitrary user_id instead of the authenticated user",
       "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
       "requires_human_review": true,
+      "severity_rationale": "assumption guards `asset.access_token` (critical-sensitivity) \u2192 High",
       "proposed_baseline_update": {
         "kind": "assumption_revisited",
         "target": "asm.user_scoped_access",
@@ -118,7 +98,7 @@
       }
     },
     {
-      "delta_id": "td-17421-5",
+      "delta_id": "td-17421-4",
       "pr": "17421",
       "type": "new_entry_point",
       "affected_elements": [
@@ -131,22 +111,30 @@
       ],
       "contradicts_assumption": null,
       "severity": "high",
-      "confidence": "medium",
+      "confidence": "high",
       "evidence": {
         "files": [
           "synapse/rest/client/account_export.py"
         ],
         "entry_points": [
           "http_client_api"
-        ]
+        ],
+        "regions": {
+          "synapse/rest/client/account_export.py": 1
+        }
       },
-      "description": "New entry point on Client-Server REST API (edge zone). STRIDE: InformationDisclosure: returns any user's account data and messages without authorization; ElevationOfPrivilege: non-admin caller reads arbitrary users' data by id; Spoofing: user_id read from query string, not bound to an authenticated caller",
+      "description": "2 change-signals on Client-Server REST API (edge zone): new entry point, asset-handling change. STRIDE: InformationDisclosure: returns any user's account data and messages without authorization; ElevationOfPrivilege: non-admin caller reads arbitrary users' data by id; Spoofing: user_id read from query string, not bound to an authenticated caller",
       "recommended_action": "Confirm the new entry point is intended; add explicit authz + input validation, or route it through the gateway.",
       "requires_human_review": true,
+      "severity_rationale": "touches `asset.access_token` (critical-sensitivity) \u2192 at least High",
+      "change_signals": [
+        "new entry point",
+        "asset-handling change"
+      ],
       "proposed_baseline_update": {
         "kind": "component_entry_point_added",
         "target": "comp.client_api",
-        "change": "entry_points += http_client_api"
+        "change": "entry_points += http_client_api; review handles_assets"
       }
     }
   ]

@@ -40,7 +40,10 @@ def _build_llm(args: argparse.Namespace) -> LLMClient:
     # Reasoning is ON by default (spec §2): on a small model like gemma4:e2b it
     # is affordable on CPU and gives the best results (richer STRIDE + the
     # assumption checks). `--no-think` disables it for a larger/slower model.
-    config = LLMConfig(reasoning=getattr(args, "think", True))
+    config = LLMConfig(
+        reasoning=getattr(args, "think", True),
+        votes=max(1, getattr(args, "votes", 1) or 1),
+    )
     try:
         return build_client(
             getattr(args, "llm", "stub"),
@@ -68,6 +71,16 @@ def _add_llm_args(p: argparse.ArgumentParser) -> None:
         dest="think",
         default=True,
         help="disable model reasoning (faster; reasoning is on by default)",
+    )
+    p.add_argument(
+        "--votes",
+        type=int,
+        default=1,
+        help=(
+            "self-consistency votes per model call (default: 1 = off). >1 keeps "
+            "only what a majority of samples agree on — better recall/precision "
+            "on small models, at N× the wall-clock."
+        ),
     )
 
 
@@ -136,6 +149,13 @@ def _add_analyze_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--annotations", help="step-5 annotations JSON (optional)")
     p.add_argument("--findings", help="step 2-4 findings JSON (optional)")
     p.add_argument("--pr", default="", help="PR number/identifier")
+    p.add_argument(
+        "--since",
+        help=(
+            "a previous run's deltas JSON; suppress deltas already reported there "
+            "so this run surfaces only what changed (incremental mode)"
+        ),
+    )
     p.add_argument("--sarif", help="write SARIF 2.1.0 log to this path")
     p.add_argument("--comment", help="write the PR comment markdown to this path")
     p.add_argument("--json", dest="json_out", help="write the raw deltas JSON to this path")
@@ -170,6 +190,7 @@ def _cmd_analyze(args: argparse.Namespace) -> int:
         pr=args.pr,
         llm=_build_llm(args),
         max_hunk_chars=args.max_hunk_chars,
+        prior=getattr(args, "since", None),
     )
 
     if args.sarif:

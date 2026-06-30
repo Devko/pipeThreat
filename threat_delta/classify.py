@@ -48,18 +48,29 @@ def classify_change(
 ) -> Flags:
     """6b — classify which coarse delta-types are plausibly in play.
 
-    Builds the classification prompt, runs one JSON completion and maps the
-    result into :class:`Flags`. Missing keys default to ``False``; a top-level
-    ``"low_confidence": true`` propagates to :attr:`Flags.low_confidence`.
+    Builds the classification prompt and runs ``config.votes`` samples (one by
+    default). Each flag is set when a **majority** of samples set it; a split
+    vote (no majority either way) marks :attr:`Flags.low_confidence`, as does any
+    sample returning ``"low_confidence": true``. Missing keys default to
+    ``False``.
     """
     prompt = prompts.classification_prompt(slice, diff, annotations)
-    result = llm.complete_json(
+    samples = llm.complete_json_samples(
         prompt, stage="classify", prefer_keys=("new_entry_point", "trust_boundary_crossing")
     )
 
+    n = len(samples)
+    majority = n // 2 + 1
     flags = Flags()
+    split = False
     for key in _FLAG_KEYS:
-        if key in result:
-            setattr(flags, key, _coerce_bool(result[key]))
-    flags.low_confidence = _coerce_bool(result.get("low_confidence", False))
+        votes_true = sum(1 for s in samples if _coerce_bool(s.get(key, False)))
+        setattr(flags, key, votes_true >= majority)
+        # A flag the samples genuinely disagreed on (some yes, some no) is a
+        # weak signal — record it so confidence can be lowered downstream.
+        if 0 < votes_true < n:
+            split = True
+    flags.low_confidence = split or any(
+        _coerce_bool(s.get("low_confidence", False)) for s in samples
+    )
     return flags
