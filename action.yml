@@ -84,13 +84,13 @@ runs:
       run: pip install "${{ github.action_path }}"
 
     # --- Optional: provision a local Gemma model on the runner ------------- #
-    # Only runs when llm=ollama. The model weights are cached so only the first
-    # run on a given model pays the ~3GB download. A 4B quantized model runs on
-    # the CPU-only GitHub runner — slow per call, but the step makes only 3-5
-    # calls per PR and is async/non-blocking (spec's "CPU-only CI runner, ~4B").
+    # Only runs when llm=ollama. A ~4B model runs on the CPU-only GitHub runner —
+    # slow per call, but the step makes only 3-5 calls per PR and is
+    # async/non-blocking (spec's "CPU-only CI runner, ~4B"). The model is re-pulled
+    # each run: a 9.6GB model is too large to cache reliably (near GitHub's 10GB
+    # cache limit). For fast repeated runs use a self-hosted runner with the model
+    # pre-pulled, or point --llm openai at an existing endpoint.
     - name: Free disk space
-      # A multi-GB model plus its cache tarball can overrun the runner's free
-      # space; reclaim ~12GB+ by removing preinstalled toolchains we don't use.
       if: ${{ inputs.llm == 'ollama' }}
       shell: bash
       run: |
@@ -98,36 +98,21 @@ runs:
           /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
         df -h /
 
-    - name: Cache Ollama model
-      if: ${{ inputs.llm == 'ollama' }}
-      uses: actions/cache@v4
-      with:
-        path: ~/.ollama/models
-        key: ollama-${{ inputs.llm-model }}
-
     - name: Provision Ollama + model
       if: ${{ inputs.llm == 'ollama' }}
       shell: bash
       run: |
         set -euo pipefail
-        # Keep models under a runner-owned dir matching the cache path above.
-        export OLLAMA_MODELS="$HOME/.ollama/models"
-        mkdir -p "$OLLAMA_MODELS"
         if ! command -v ollama >/dev/null 2>&1; then
           curl -fsSL https://ollama.com/install.sh | sh
         fi
-        # Stop the installer's service so our own server (with OLLAMA_MODELS)
-        # owns the port and the cacheable model directory.
-        sudo systemctl stop ollama 2>/dev/null || true
-        ollama serve >"${RUNNER_TEMP:-/tmp}/ollama.log" 2>&1 &
+        # The installer starts ollama as a systemd service; wait for it.
         for i in $(seq 1 30); do
           curl -fsS http://localhost:11434/api/tags >/dev/null 2>&1 && break
           sleep 1
         done
         ollama pull "${{ inputs.llm-model }}"
-        # Warm up: load the model into memory now so the first analysis call
-        # doesn't pay the (multi-minute, for a ~9.6GB model) cold load under the
-        # client request timeout.
+        # Warm up so the model is resident before the first (timed) analysis call.
         ollama run "${{ inputs.llm-model }}" "Reply with the single word: OK" >/dev/null 2>&1 || true
 
     - name: Resolve PR diff
