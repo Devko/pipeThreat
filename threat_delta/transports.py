@@ -156,13 +156,23 @@ class OpenAICompatibleClient(LLMClient):
             raise LLMError(f"LLM returned non-JSON HTTP response: {exc}") from exc
 
         try:
-            content = data["choices"][0]["message"]["content"]
+            message = data["choices"][0]["message"]
         except (KeyError, IndexError, TypeError) as exc:
             raise LLMError(
-                f"LLM response missing choices[0].message.content: {data!r:.200}"
+                f"LLM response missing choices[0].message: {data!r:.200}"
             ) from exc
+
+        content = (message.get("content") or "").strip()
         if not content:
-            raise LLMError("LLM returned empty message content")
+            # Thinking models (e.g. gemma4:e4b on Ollama) can return an empty
+            # `content` and put their output in a reasoning channel instead. Fall
+            # back to that — parse_json_object still recovers the JSON object from
+            # the surrounding chain-of-thought.
+            content = (
+                message.get("reasoning_content") or message.get("reasoning") or ""
+            ).strip()
+        if not content:
+            raise LLMError(f"LLM returned empty message content: {message!r:.200}")
         return content
 
 

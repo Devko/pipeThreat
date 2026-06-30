@@ -66,7 +66,7 @@ def test_request_body_shape():
         {"role": "user", "content": "the-prompt"},
     ]
     assert body["temperature"] == 0.0
-    assert body["max_tokens"] == 512
+    assert body["max_tokens"] == 1536
     assert body["stream"] is False
 
 
@@ -206,4 +206,45 @@ def test_non_reasoning_400_surfaces_body():
 
     client = OpenAICompatibleClient(http_post=fake_post, config=LLMConfig(reasoning=False))
     with pytest.raises(LLMError, match="bad model name"):
+        client.complete_json("hi", stage="classify")
+
+
+def test_empty_content_falls_back_to_reasoning_channel():
+    """A thinking model (gemma4:e4b) may return empty `content` and put the
+    answer in a reasoning channel — we must still recover the JSON."""
+    import json as _json
+
+    from threat_delta.transports import OpenAICompatibleClient
+
+    def fake_post(url, headers, body, timeout):
+        return _json.dumps(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "reasoning": 'Let me think... {"new_entry_point": true}',
+                        }
+                    }
+                ]
+            }
+        ).encode()
+
+    client = OpenAICompatibleClient(http_post=fake_post)
+    assert client.complete_json("hi", stage="classify") == {"new_entry_point": True}
+
+
+def test_truly_empty_message_errors():
+    import json as _json
+
+    import pytest
+
+    from threat_delta.llm import LLMError
+    from threat_delta.transports import OpenAICompatibleClient
+
+    def fake_post(url, headers, body, timeout):
+        return _json.dumps({"choices": [{"message": {"content": ""}}]}).encode()
+
+    client = OpenAICompatibleClient(http_post=fake_post)
+    with pytest.raises(LLMError, match="empty message content"):
         client.complete_json("hi", stage="classify")
