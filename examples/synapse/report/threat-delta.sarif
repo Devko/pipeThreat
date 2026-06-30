@@ -1,0 +1,234 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "threat-model-delta",
+          "informationUri": "https://github.com/Devko/pipeThreat",
+          "rules": [
+            {
+              "id": "asset_exposure",
+              "name": "AssetExposure",
+              "shortDescription": {
+                "text": "asset exposure"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "helpUri": "https://github.com/Devko/pipeThreat/blob/main/docs/deltas.md#asset_exposure"
+            },
+            {
+              "id": "assumption_violation",
+              "name": "AssumptionViolation",
+              "shortDescription": {
+                "text": "assumption violation"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "helpUri": "https://github.com/Devko/pipeThreat/blob/main/docs/deltas.md#assumption_violation"
+            },
+            {
+              "id": "new_entry_point",
+              "name": "NewEntryPoint",
+              "shortDescription": {
+                "text": "new entry point"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "helpUri": "https://github.com/Devko/pipeThreat/blob/main/docs/deltas.md#new_entry_point"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "asset_exposure",
+          "level": "warning",
+          "message": {
+            "text": "Asset-handling change on Client-Server REST API (edge zone). STRIDE: InformationDisclosure: returns any user's account data and messages without authorization; ElevationOfPrivilege: non-admin caller reads arbitrary users' data by id; Spoofing: user_id read from query string, not bound to an authenticated caller"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "synapse/rest/client/account_export.py"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-17421-1"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [
+              "InformationDisclosure",
+              "ElevationOfPrivilege",
+              "Spoofing"
+            ],
+            "contradicts_assumption": null,
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.client_api"
+            ],
+            "recommended_action": "Confirm the asset exposure is intended; verify access controls and that sensitive data is not newly disclosed.",
+            "proposed_baseline_update": {
+              "kind": "component_asset_handling_changed",
+              "target": "comp.client_api",
+              "change": "review handles_assets for comp.client_api"
+            }
+          }
+        },
+        {
+          "ruleId": "assumption_violation",
+          "level": "warning",
+          "message": {
+            "text": "Change weakens or violates assumption 'asm.admin_requires_admin': returns another user's data without a server-admin token"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "synapse/rest/client/account_export.py"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-17421-2"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [],
+            "contradicts_assumption": "asm.admin_requires_admin",
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.client_api"
+            ],
+            "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+            "proposed_baseline_update": {
+              "kind": "assumption_revisited",
+              "target": "asm.admin_requires_admin",
+              "change": "confirm intended; update or reaffirm the assumption"
+            }
+          }
+        },
+        {
+          "ruleId": "assumption_violation",
+          "level": "warning",
+          "message": {
+            "text": "Change weakens or violates assumption 'asm.client_requires_token': new client endpoint mounted with no access-token check"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "synapse/rest/client/account_export.py"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-17421-3"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [],
+            "contradicts_assumption": "asm.client_requires_token",
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.client_api"
+            ],
+            "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+            "proposed_baseline_update": {
+              "kind": "assumption_revisited",
+              "target": "asm.client_requires_token",
+              "change": "confirm intended; update or reaffirm the assumption"
+            }
+          }
+        },
+        {
+          "ruleId": "assumption_violation",
+          "level": "warning",
+          "message": {
+            "text": "Change weakens or violates assumption 'asm.user_scoped_access': reads an arbitrary user_id instead of the authenticated user"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "synapse/rest/client/account_export.py"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-17421-4"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [],
+            "contradicts_assumption": "asm.user_scoped_access",
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.client_api"
+            ],
+            "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+            "proposed_baseline_update": {
+              "kind": "assumption_revisited",
+              "target": "asm.user_scoped_access",
+              "change": "confirm intended; update or reaffirm the assumption"
+            }
+          }
+        },
+        {
+          "ruleId": "new_entry_point",
+          "level": "warning",
+          "message": {
+            "text": "New entry point on Client-Server REST API (edge zone). STRIDE: InformationDisclosure: returns any user's account data and messages without authorization; ElevationOfPrivilege: non-admin caller reads arbitrary users' data by id; Spoofing: user_id read from query string, not bound to an authenticated caller"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "synapse/rest/client/account_export.py"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-17421-5"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [
+              "InformationDisclosure",
+              "ElevationOfPrivilege",
+              "Spoofing"
+            ],
+            "contradicts_assumption": null,
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.client_api"
+            ],
+            "recommended_action": "Confirm the new entry point is intended; add explicit authz + input validation, or route it through the gateway.",
+            "proposed_baseline_update": {
+              "kind": "component_entry_point_added",
+              "target": "comp.client_api",
+              "change": "entry_points += http_client_api"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

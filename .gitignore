@@ -8,5 +8,7 @@ dist/
 .venv/
 venv/
 *.sarif
+# ...but keep the committed worked-example report.
+!examples/**/report/*.sarif
 .coverage
 htmlcov/
