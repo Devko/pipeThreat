@@ -110,6 +110,10 @@ runs:
           sleep 1
         done
         ollama pull "${{ inputs.llm-model }}"
+        # Warm up: load the model into memory now so the first analysis call
+        # doesn't pay the (multi-minute, for a ~9.6GB model) cold load under the
+        # client request timeout.
+        ollama run "${{ inputs.llm-model }}" "Reply with the single word: OK" >/dev/null 2>&1 || true
 
     - name: Resolve PR diff
       id: diff

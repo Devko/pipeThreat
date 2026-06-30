@@ -55,6 +55,10 @@ jobs:
           echo "Pulling ${{ github.event.inputs.model }} ..."
           ollama pull "${{ github.event.inputs.model }}"
           ollama list
+          # Warm up: load the model into memory now (cold load can take minutes
+          # for a 9.6GB model) so the first analysis call doesn't hit a timeout.
+          echo "Warming up ${{ github.event.inputs.model }} ..."
+          ollama run "${{ github.event.inputs.model }}" "Reply with the single word: OK" >/dev/null 2>&1 || true
 
       - name: Run the Synapse sample against live Gemma
         run: |

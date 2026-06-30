@@ -61,7 +61,9 @@ class LLMConfig:
     stage_reasoning_budgets: dict = field(
         default_factory=lambda: dict(DEFAULT_STAGE_BUDGETS)
     )
-    timeout_s: float = 120.0
+    # Generous default: a ~4B model on a cold CPU runner can take minutes for the
+    # first inference (model load + generation).
+    timeout_s: float = 300.0
 
     def budget_for(self, stage: str | None) -> int:
         """Reasoning-token budget for ``stage`` (0 when reasoning is disabled)."""
