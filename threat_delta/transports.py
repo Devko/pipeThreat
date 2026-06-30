@@ -120,6 +120,23 @@ class OpenAICompatibleClient(LLMClient):
         body.update(self.extra_body)
         return body
 
+    def _do_post(self, url: str, headers: dict, body: dict) -> dict:
+        """POST ``body`` as JSON and return the parsed response, wrapping errors."""
+        payload = json.dumps(body).encode("utf-8")
+        try:
+            raw = self.http_post(url, headers, payload, self.config.timeout_s)
+        except urllib.error.HTTPError as exc:
+            raise LLMError(
+                f"LLM HTTP request to {url} failed: HTTP {exc.code} "
+                f"{_read_http_error(exc)}".strip()
+            ) from exc
+        except urllib.error.URLError as exc:
+            raise LLMError(f"LLM HTTP request to {url} failed: {exc}") from exc
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, ValueError) as exc:
+            raise LLMError(f"LLM returned non-JSON HTTP response: {exc}") from exc
+
     def _raw_complete(
         self, system: str, prompt: str, *, stage: str | None = None
     ) -> str:
@@ -209,9 +226,50 @@ class OllamaClient(OpenAICompatibleClient):
             extra_body=extra_body,
             http_post=http_post,
         )
-        # Ollama understands the `think` field, so we can actively disable a
-        # thinking model's chain-of-thought when reasoning is off.
-        self._send_think_false = True
+
+    @property
+    def _native_base(self) -> str:
+        """Ollama's native API root (the OpenAI shim lives under ``/v1``)."""
+        base = self.base_url
+        return base[:-3] if base.endswith("/v1") else base
+
+    def _raw_complete(
+        self, system: str, prompt: str, *, stage: str | None = None
+    ) -> str:
+        """Use Ollama's NATIVE ``/api/chat`` endpoint.
+
+        Unlike the OpenAI ``/v1`` shim, the native API reliably honors the
+        ``think`` flag — essential for a thinking model like gemma4:e4b on a CPU
+        runner, where leaving thinking on is slow and can bury/truncate the JSON
+        answer. The answer is returned directly in ``message.content``.
+        """
+        headers = {"Content-Type": "application/json"}
+        url = f"{self._native_base}/api/chat"
+        think = self._reasoning_enabled and self.config.budget_for(stage) > 0
+        body: dict = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt},
+            ],
+            "stream": False,
+            "think": think,
+            "options": {
+                "temperature": self.config.temperature,
+                "num_predict": self.config.max_tokens,
+            },
+        }
+        body.update(self.extra_body)
+
+        data = self._do_post(url, headers, body)
+        message = data.get("message") or {}
+        content = (message.get("content") or "").strip()
+        if not content:
+            # If the model still emitted only thinking, recover from there.
+            content = (message.get("thinking") or "").strip()
+        if not content:
+            raise LLMError(f"Ollama returned empty message content: {data!r:.200}")
+        return content
 
 
 def build_client(

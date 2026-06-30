@@ -250,25 +250,37 @@ def test_truly_empty_message_errors():
         client.complete_json("hi", stage="classify")
 
 
-def test_ollama_disables_thinking_when_reasoning_off():
-    """OllamaClient with reasoning off sends think:false (fast, direct answer);
-    with reasoning on it sends reasoning_effort and no think field."""
+def _ollama_canned(content: str = '{"new_entry_point": true}') -> bytes:
+    return json.dumps({"message": {"role": "assistant", "content": content}}).encode()
+
+
+def test_ollama_uses_native_api_and_toggles_think():
+    """OllamaClient hits the native /api/chat endpoint and sets think from the
+    reasoning config (off by default for fast, direct answers on CPU)."""
     from threat_delta.llm import LLMConfig
     from threat_delta.transports import OllamaClient
 
-    off = RecordingPost()
+    off = RecordingPost(response=_ollama_canned())
     c_off = OllamaClient(http_post=off, config=LLMConfig(reasoning=False))
-    c_off._raw_complete("s", "p", stage="classify")
+    out = c_off._raw_complete("s", "p", stage="classify")
+    assert out == '{"new_entry_point": true}'
+    assert off.url == "http://localhost:11434/api/chat"  # native, not /v1
     body_off = off.sent_json()
     assert body_off["think"] is False
+    assert body_off["options"]["temperature"] == 0.0
     assert "reasoning_effort" not in body_off
 
-    on = RecordingPost()
+    on = RecordingPost(response=_ollama_canned())
     c_on = OllamaClient(http_post=on, config=LLMConfig(reasoning=True))
     c_on._raw_complete("s", "p", stage="classify")
-    body_on = on.sent_json()
-    assert "think" not in body_on
-    assert body_on["reasoning_effort"] == "low"
+    assert on.sent_json()["think"] is True
+
+
+def test_ollama_complete_json_parses_native_response():
+    from threat_delta.transports import OllamaClient
+
+    client = OllamaClient(http_post=RecordingPost(response=_ollama_canned()))
+    assert client.complete_json("hi", stage="classify") == {"new_entry_point": True}
 
 
 def test_parser_recovers_answer_from_chain_of_thought():
