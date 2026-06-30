@@ -1,0 +1,98 @@
+# Manually-triggered smoke test: run the Synapse worked example LIVE against a
+# local Gemma (Ollama) on a CPU-only GitHub runner. This is the one path the unit
+# tests can't cover — it proves the real 6b/6c/6d model calls work end-to-end.
+#
+# Trigger from the Actions tab ("Run workflow") or via the API. It is advisory:
+# the step never fails the build, so a green run means the live model path works.
+name: gemma-smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Ollama model to run (CPU-friendly ~4B)"
+        required: false
+        default: "gemma3:4b"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gemma-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install threat-delta
+        run: pip install -e .
+
+      - name: Cache Ollama model
+        uses: actions/cache@v4
+        with:
+          path: ~/.ollama/models
+          key: ollama-${{ github.event.inputs.model }}
+
+      - name: Provision Ollama + model
+        run: |
+          set -euo pipefail
+          if ! command -v ollama >/dev/null 2>&1; then
+            curl -fsSL https://ollama.com/install.sh | sh
+          fi
+          ollama serve >"$RUNNER_TEMP/ollama.log" 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:11434/api/tags >/dev/null 2>&1 && break
+            sleep 1
+          done
+          echo "Pulling ${{ github.event.inputs.model }} ..."
+          ollama pull "${{ github.event.inputs.model }}"
+          ollama list
+
+      - name: Run the Synapse sample against live Gemma
+        run: |
+          set -euo pipefail
+          threat-delta analyze \
+            --baseline examples/synapse/threat-model.yaml \
+            --diff examples/synapse/pr-account-export.diff \
+            --annotations examples/synapse/pr-account-export.annotations.json \
+            --pr 17421 \
+            --llm ollama --llm-model "${{ github.event.inputs.model }}" \
+            --sarif "$RUNNER_TEMP/threat-delta.sarif" \
+            --comment "$RUNNER_TEMP/threat-delta.md" \
+            --json "$RUNNER_TEMP/deltas.json" | tee "$RUNNER_TEMP/stdout.txt"
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## Live Gemma smoke result (${{ github.event.inputs.model }})"
+            echo
+            echo "### Model server log (tail)"
+            echo '```'
+            tail -n 20 "$RUNNER_TEMP/ollama.log" 2>/dev/null || echo "(no log)"
+            echo '```'
+            echo "### Generated PR comment"
+            echo
+            cat "$RUNNER_TEMP/threat-delta.md" 2>/dev/null || echo "(no comment produced)"
+            echo
+            echo "### Delta count"
+            python -c "import json,os; d=json.load(open(os.environ['RUNNER_TEMP']+'/deltas.json')); print(len(d['deltas']), 'deltas')" 2>/dev/null || echo "n/a"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemma-smoke-report
+          path: |
+            ${{ runner.temp }}/threat-delta.sarif
+            ${{ runner.temp }}/threat-delta.md
+            ${{ runner.temp }}/deltas.json
