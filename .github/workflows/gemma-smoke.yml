@@ -6,6 +6,11 @@ name: gemma-smoke
 on:
   workflow_dispatch:
     inputs:
+      example:
+        description: "which worked example to run"
+        type: choice
+        options: [synapse, vault, n8n]
+        default: synapse
       model:
         description: "Ollama model to run (e.g. gemma4:e2b, gemma4:e4b)"
         required: false
@@ -70,12 +75,17 @@ jobs:
           set -euo pipefail
           FLAG=""  # reasoning is on by default
           if [ "${{ github.event.inputs.think }}" = "false" ]; then FLAG="--no-think"; fi
-          echo "Reasoning: ${FLAG:-on}"
+          case "${{ github.event.inputs.example }}" in
+            vault) DIR=examples/vault; STEM=pr-debug-inspect;  PR=29101 ;;
+            n8n)   DIR=examples/n8n;   STEM=pr-public-trigger; PR=8421  ;;
+            *)     DIR=examples/synapse; STEM=pr-account-export; PR=17421 ;;
+          esac
+          echo "Example: ${{ github.event.inputs.example }} ($DIR) · reasoning: ${FLAG:-on}"
           threat-delta analyze \
-            --baseline examples/synapse/threat-model.yaml \
-            --diff examples/synapse/pr-account-export.diff \
-            --annotations examples/synapse/pr-account-export.annotations.json \
-            --pr 17421 \
+            --baseline "$DIR/threat-model.yaml" \
+            --diff "$DIR/$STEM.diff" \
+            --annotations "$DIR/$STEM.annotations.json" \
+            --pr "$PR" \
             --llm ollama --llm-model "${{ github.event.inputs.model }}" $FLAG \
             --sarif "$RUNNER_TEMP/threat-delta.sarif" \
             --comment "$RUNNER_TEMP/threat-delta.md" \
@@ -85,7 +95,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "## Live Gemma smoke result (${{ github.event.inputs.model }})"
+            echo "## Live smoke result — ${{ github.event.inputs.example }} · ${{ github.event.inputs.model }}"
             echo
             echo "### Model server log (tail)"
             echo '```'
