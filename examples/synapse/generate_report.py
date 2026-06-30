@@ -15,7 +15,7 @@ is the real, deterministic pipeline. Run it live instead with:
         --baseline examples/synapse/threat-model.yaml \
         --diff examples/synapse/pr-account-export.diff \
         --annotations examples/synapse/pr-account-export.annotations.json \
-        --pr 17421 --llm ollama --llm-model gemma4:e4b \
+        --pr 17421 --llm ollama --llm-model gemma4:e2b \
         --sarif report/threat-delta.sarif --comment report/threat-delta.md
 """
 

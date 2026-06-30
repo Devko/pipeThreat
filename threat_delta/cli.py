@@ -37,10 +37,10 @@ def _build_llm(args: argparse.Namespace) -> LLMClient:
     rather than hallucinating). ``ollama``/``openai`` target a local
     OpenAI-compatible server running a Gemma-class model.
     """
-    # Thinking is OFF by default: a chain-of-thought model on a CPU runner is
-    # slow and can bury/cut off the JSON answer. `--think` opts back into the
-    # spec's bounded reasoning mode.
-    config = LLMConfig(reasoning=getattr(args, "think", False))
+    # Reasoning is ON by default (spec §2): on a small model like gemma4:e2b it
+    # is affordable on CPU and gives the best results (richer STRIDE + the
+    # assumption checks). `--no-think` disables it for a larger/slower model.
+    config = LLMConfig(reasoning=getattr(args, "think", True))
     try:
         return build_client(
             getattr(args, "llm", "stub"),
@@ -61,11 +61,13 @@ def _add_llm_args(p: argparse.ArgumentParser) -> None:
         help="LLM transport (default: stub — offline, reports nothing)",
     )
     p.add_argument("--llm-base-url", help="OpenAI-compatible server base URL")
-    p.add_argument("--llm-model", help="model name (e.g. gemma4:e4b)")
+    p.add_argument("--llm-model", help="model name (e.g. gemma4:e2b)")
     p.add_argument(
-        "--think",
-        action="store_true",
-        help="enable bounded model reasoning (slower on CPU; off by default)",
+        "--no-think",
+        action="store_false",
+        dest="think",
+        default=True,
+        help="disable model reasoning (faster; reasoning is on by default)",
     )
 
 
@@ -97,7 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="use an LLM to draft judgment fields (default: stub = deterministic only)",
     )
     i.add_argument("--llm-base-url", help="OpenAI-compatible server base URL")
-    i.add_argument("--llm-model", help="model name (e.g. gemma4:e4b)")
+    i.add_argument("--llm-model", help="model name (e.g. gemma4:e2b)")
 
     # validate ------------------------------------------------------------ #
     v = sub.add_parser("validate", help="check baseline referential integrity")

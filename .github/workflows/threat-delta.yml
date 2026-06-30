@@ -31,7 +31,7 @@ jobs:
           # llm: stub is the default (deterministic only, no model). For real
           # 6b/6c/6d signal, provision a local Gemma on the runner:
           #   llm: ollama
-          #   llm-model: gemma4:e4b  # ~9.6GB, cached; runs on the CPU runner
+          #   llm-model: gemma4:e2b  # ~7.2GB; reasoning on by default, CPU runner
           llm: stub
 
       - name: Upload SARIF

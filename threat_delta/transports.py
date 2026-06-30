@@ -220,7 +220,7 @@ class OllamaClient(OpenAICompatibleClient):
     ) -> None:
         super().__init__(
             base_url=base_url,
-            model=model or "gemma4:e4b",
+            model=model or "gemma4:e2b",
             api_key=api_key,
             config=config,
             extra_body=extra_body,

@@ -133,7 +133,7 @@ def test_build_client_ollama():
     client = build_client("ollama")
     assert isinstance(client, OllamaClient)
     assert "11434" in client.base_url
-    assert client.model == "gemma4:e4b"
+    assert client.model == "gemma4:e2b"
 
 
 def test_build_client_stub_default():

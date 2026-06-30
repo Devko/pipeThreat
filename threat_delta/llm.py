@@ -50,9 +50,9 @@ DEFAULT_STAGE_BUDGETS = {
 
 @dataclass
 class LLMConfig:
-    model: str = "gemma4:e4b"
+    model: str = "gemma4:e2b"
     temperature: float = 0.0
-    # Room for a thinking model (e.g. gemma4:e4b) to reason *and* still emit the
+    # Room for a thinking model (e.g. gemma4:e2b) to reason *and* still emit the
     # JSON answer; a tighter cap can leave `content` empty after the thinking.
     max_tokens: int = 1536
     # Reasoning/thinking ON for the analysis calls, but capped (spec §2/§11).

@@ -112,13 +112,26 @@ Three transports ship in `threat_delta.transports` (stdlib only, no extra deps):
 | `--llm` | Client | Default endpoint / model |
 |---|---|---|
 | `stub` (default) | offline, reports nothing rather than hallucinating | — |
-| `ollama` | `OllamaClient` | `http://localhost:11434/v1`, `gemma4:e4b` |
+| `ollama` | `OllamaClient` | Ollama's native `/api/chat`, `gemma4:e2b` |
 | `openai` | `OpenAICompatibleClient` | any OpenAI-compatible `/chat/completions` (llama.cpp server, vLLM, LM Studio) |
 
+**Recommended: `gemma4:e2b` with reasoning on.** Reasoning is **on by default**
+(`--no-think` to disable). A measured comparison on a CPU `ubuntu-latest` runner,
+analysing the Synapse worked example (see below):
+
+| model + mode | STRIDE coverage | assumption checks | analyze time |
+|---|---|---|---|
+| `gemma4:e4b`, reasoning off | InformationDisclosure | — | ~3 min |
+| `gemma4:e4b`, reasoning on | (lost in chain-of-thought) | 2 | ~13 min |
+| **`gemma4:e2b`, reasoning on** | **InfoDisclosure + ElevationOfPrivilege** | **2** | **~4 min** |
+
+The smaller "effective-2B" model (7.2 GB) thinks fast enough on CPU that bounded
+reasoning is affordable — giving the richest STRIDE *and* the assumption-check
+signal, quickly. `e4b` is heavier (9.6 GB) and best run with `--no-think`.
+
 ```bash
-# Run the analysis against a local Gemma via Ollama:
-threat-delta analyze --baseline threat-model.yaml --diff pr.diff \
-  --llm ollama --llm-model gemma4:e4b
+# Recommended: local gemma4:e2b via Ollama, reasoning on (the default):
+threat-delta analyze --baseline threat-model.yaml --diff pr.diff --llm ollama
 ```
 
 Or from Python:
@@ -126,8 +139,12 @@ Or from Python:
 ```python
 from threat_delta import run_step, build_client
 result = run_step(baseline="threat-model.yaml", diff="pr.diff",
-                  llm=build_client("ollama", model="gemma4:e4b"))
+                  llm=build_client("ollama"))  # gemma4:e2b
 ```
+
+> Ollama-specific note: `OllamaClient` calls Ollama's **native `/api/chat`**
+> endpoint, because the OpenAI `/v1` shim silently ignores the `think` flag (so a
+> thinking model never actually stops thinking). The native endpoint honors it.
 
 ### Running Gemma in CI
 
@@ -140,26 +157,23 @@ real 6b/6c/6d signal, switch the action to provision a local Gemma on the runner
   with:
     baseline: threat-model.yaml
     llm: ollama
-    llm-model: gemma4:e4b
+    llm-model: gemma4:e2b   # ~7.2GB; the default
 ```
 
-The action then installs Ollama, **caches** the model weights (so only the first
-run pays the ~9.6 GB pull), serves it, and points the step at it. Gemma 4 E4B (an
-"effective 4B" edge model) runs on the standard CPU-only `ubuntu-latest` runner —
-slow per call (tens of seconds), but the step makes only 3–5 calls per PR and is
-async/non-blocking, which is exactly the spec's runtime target ("CPU-only CI
-runner, local ~4B / Gemma 4 E4B class"). For
-faster turnaround, point `--llm openai`/the action at a self-hosted runner or an
-internal OpenAI-compatible endpoint instead.
+The action installs Ollama, pulls the model (~4 min; not cached — a multi-GB model
+is too large for GitHub's 10 GB cache), serves it, and points the step at it. It
+runs on the standard CPU-only `ubuntu-latest` runner — slow per call (tens of
+seconds), but the step makes only 3–5 calls per PR and is async/non-blocking,
+exactly the spec's runtime target ("CPU-only CI runner, local ~4B"). For fast
+repeated runs, use a self-hosted runner with the model pre-pulled, or point
+`--llm openai` at an existing endpoint.
 
 **Reasoning is on but capped** (spec §2/§11): `temperature=0` and a *per-stage*
 reasoning budget — 6b classify `128`, 6c STRIDE `256`, 6d assumptions `384`
-tokens (`LLMConfig.stage_reasoning_budgets`, surfaced to the server as a
-`reasoning_effort` hint; `temperature`/`max_tokens` are always hard caps). Set
-`LLMConfig(reasoning=False)` to disable thinking entirely. Reasoning-API support
-varies by server, so the budget is best-effort; the caps are not. The integration
-test (`tests/test_pipeline.py`) demonstrates the full §12 worked example with a
-scripted client.
+tokens (`LLMConfig.stage_reasoning_budgets`; `temperature`/`max_tokens` are always
+hard caps). `--no-think` (or `LLMConfig(reasoning=False)`) disables thinking for a
+larger/slower model. The integration test (`tests/test_pipeline.py`) demonstrates
+the full §12 worked example with a scripted client.
 
 ### LLM-assisted baseline drafting
 

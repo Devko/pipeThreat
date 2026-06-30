@@ -64,7 +64,7 @@ threat-delta analyze \
   --baseline examples/synapse/threat-model.yaml \
   --diff examples/synapse/pr-account-export.diff \
   --annotations examples/synapse/pr-account-export.annotations.json \
-  --pr 17421 --llm ollama --llm-model gemma4:e4b \
+  --pr 17421 --llm ollama --llm-model gemma4:e2b \
   --sarif examples/synapse/report/threat-delta.sarif \
   --comment examples/synapse/report/threat-delta.md
 ```
