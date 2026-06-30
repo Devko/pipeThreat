@@ -1,9 +1,6 @@
-# Manually-triggered smoke test: run the Synapse worked example LIVE against a
-# local Gemma (Ollama) on a CPU-only GitHub runner. This is the one path the unit
-# tests can't cover — it proves the real 6b/6c/6d model calls work end-to-end.
-#
-# Trigger from the Actions tab ("Run workflow") or via the API. It is advisory:
-# the step never fails the build, so a green run means the live model path works.
+# Manually-triggered smoke test: run the Synapse worked example against a real
+# local Gemma (Ollama) on a CPU runner — the one path unit tests can't cover.
+# Trigger from the Actions tab or via the API.
 name: gemma-smoke
 
 on:
@@ -29,9 +26,7 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    # gemma4:e4b is a *thinking* model: on a CPU runner it generates a long
-    # chain-of-thought per call, so the whole job can take ~20-30 min depending
-    # on the runner. Generous headroom keeps a slow runner from being killed.
+    # A local model on a CPU runner is slow; give generous headroom.
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
@@ -44,17 +39,14 @@ jobs:
         run: pip install -e .
 
       - name: Free disk space
-        # The 9.6GB model needs headroom; reclaim ~12GB+ by removing preinstalled
-        # toolchains we don't use.
+        # Reclaim ~12GB+ for the model by removing unused preinstalled toolchains.
         run: |
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
             /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
           df -h /
 
-      # We deliberately do NOT cache the model: at 9.6GB it is near GitHub's 10GB
-      # per-repo cache limit and the save tar is slow/flaky (it has gotten the
-      # runner reclaimed mid-save). Re-pulling (~4 min) is reliable. For fast
-      # repeated runs, use a self-hosted runner with the model pre-pulled.
+      # The model is re-pulled each run (a multi-GB model is too large for
+      # GitHub's 10GB cache); for fast repeated runs use a self-hosted runner.
       - name: Provision Ollama + model
         run: |
           set -euo pipefail

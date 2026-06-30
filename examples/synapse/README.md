@@ -4,13 +4,13 @@ A complete, end-to-end run of the Threat-Model Delta step against a real,
 recognizable open-source project ([Matrix Synapse](https://github.com/element-hq/synapse)),
 showing the inputs and the generated report.
 
-> **Demo caveat.** This baseline is a small *illustrative* model authored for the
-> demo — its components and `code_paths` mirror Synapse's real package layout, but
-> it is not an authoritative threat model for the project. And because there is no
-> Gemma server in this environment, the three model calls (6b/6c/6d) are driven by
-> a **scripted stand-in** representing what a Gemma-class model is expected to
-> return for this diff. Everything else — relevance resolution, the deterministic
-> §7 severity, dedup, and SARIF/comment rendering — is the real pipeline.
+> **Note.** This baseline is a small *illustrative* model: its components and
+> `code_paths` mirror Synapse's real package layout, but it is not an authoritative
+> threat model for the project. The committed report is generated with a **scripted
+> model** (so it's deterministic and reproducible without a model server),
+> representing what a small local model returns for this diff. Everything else —
+> relevance, the deterministic §7 severity, dedup, and SARIF/comment rendering — is
+> the real pipeline. Run it live with `--llm ollama` (see below).
 
 ## The files
 

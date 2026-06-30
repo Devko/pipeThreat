@@ -5,11 +5,10 @@ Runs the real pipeline (`threat_delta.run_step`) over the sample baseline, diff
 and annotations in this directory, and writes the SARIF + PR-comment report into
 ``report/``.
 
-There is no Gemma server in this demo environment, so the three model calls
-(6b/6c/6d) are driven by a **scripted stand-in** that returns what a Gemma-class
-model is expected to produce for this diff — the same technique the integration
-tests use. Everything else (relevance, severity, dedup, SARIF/comment rendering)
-is the real, deterministic pipeline. Run it live instead with:
+The three model calls (6b/6c/6d) are driven by a **scripted model** so the report
+is deterministic and reproducible without a model server (the same technique the
+tests use). Everything else (relevance, severity, dedup, SARIF/comment rendering)
+is the real pipeline. Run it live instead with:
 
     threat-delta analyze \
         --baseline examples/synapse/threat-model.yaml \

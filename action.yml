@@ -83,13 +83,11 @@ runs:
       shell: bash
       run: pip install "${{ github.action_path }}"
 
-    # --- Optional: provision a local Gemma model on the runner ------------- #
-    # Only runs when llm=ollama. A ~4B model runs on the CPU-only GitHub runner —
-    # slow per call, but the step makes only 3-5 calls per PR and is
-    # async/non-blocking (spec's "CPU-only CI runner, ~4B"). The model is re-pulled
-    # each run: a 9.6GB model is too large to cache reliably (near GitHub's 10GB
-    # cache limit). For fast repeated runs use a self-hosted runner with the model
-    # pre-pulled, or point --llm openai at an existing endpoint.
+    # --- Optional: provision a local model on the runner (llm=ollama) ------- #
+    # A small model runs on the CPU-only runner; the step makes only 3-5 calls per
+    # PR and is async, so it never holds up the merge. The model is re-pulled each
+    # run (too large for GitHub's cache); for fast repeated runs use a self-hosted
+    # runner with the model pre-pulled, or point --llm openai at an existing endpoint.
     - name: Free disk space
       if: ${{ inputs.llm == 'ollama' }}
       shell: bash

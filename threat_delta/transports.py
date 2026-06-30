@@ -7,10 +7,10 @@ transport against any OpenAI-compatible chat-completions endpoint — llama.cpp
 server, Ollama's ``/v1`` shim, vLLM and LM Studio all expose this shape — using
 only the Python standard library (``urllib``); no third-party dependencies.
 
-The reasoning budget is mapped to the portable ``reasoning_effort`` hint plus an
-``extra_body`` escape hatch, because exact reasoning-API support varies by server
-and model. The hard caps that *always* apply regardless of server support are
-``temperature`` and ``max_tokens``.
+The reasoning budget maps to the portable ``reasoning_effort`` hint; the hard caps
+that *always* apply are ``temperature`` and ``max_tokens``. :class:`OllamaClient`
+instead uses Ollama's native ``/api/chat`` endpoint, which honors the ``think``
+flag that the ``/v1`` shim ignores.
 
 HTTP is injected via the ``http_post`` callable so the whole transport is fully
 testable offline, with no network.
@@ -76,16 +76,10 @@ class OpenAICompatibleClient(LLMClient):
         self.api_key = api_key
         self.extra_body = dict(extra_body) if extra_body else {}
         self.http_post: HttpPost = http_post or _urllib_post
-        # Reasoning hints are best-effort: some servers/models (e.g. a
-        # non-thinking gemma4:e4b on Ollama) reject `reasoning_effort` with a 400.
-        # We send it by default but disable it for this client after the first
-        # such rejection, then retry without it.
+        # The `reasoning_effort` hint is best-effort: some servers reject it with a
+        # 400. We send it by default, then disable it for this client and retry on
+        # the first such rejection.
         self._reasoning_enabled = True
-        # When reasoning is OFF, actively disable the model's thinking where the
-        # server supports it (Ollama's `think` field). Subclasses for such servers
-        # set this True. Generic OpenAI servers ignore unknown fields, but we keep
-        # it off by default to avoid a 400 on stricter servers.
-        self._send_think_false = False
 
     @staticmethod
     def _reasoning_effort(budget: int) -> str:
@@ -107,16 +101,10 @@ class OpenAICompatibleClient(LLMClient):
             "max_tokens": self.config.max_tokens,
             "stream": False,
         }
-        # Bounded reasoning (spec §2/§11). The temperature and max_tokens caps
-        # always apply; the reasoning hint is best-effort and its exact support
-        # depends on the server/model. A budget of 0 (or a degraded client) omits
-        # the hint entirely.
+        # Bounded reasoning (spec §2/§11): temperature/max_tokens are hard caps;
+        # the reasoning hint is best-effort and omitted when the budget is 0.
         if reasoning_budget > 0:
             body["reasoning_effort"] = self._reasoning_effort(reasoning_budget)
-        elif self._send_think_false:
-            # Thinking off: a chain-of-thought model on a CPU runner is slow and
-            # can bury/cut off the JSON answer. Tell Ollama to answer directly.
-            body["think"] = False
         body.update(self.extra_body)
         return body
 
@@ -190,10 +178,8 @@ class OpenAICompatibleClient(LLMClient):
 
         content = (message.get("content") or "").strip()
         if not content:
-            # Thinking models (e.g. gemma4:e4b on Ollama) can return an empty
-            # `content` and put their output in a reasoning channel instead. Fall
-            # back to that — parse_json_object still recovers the JSON object from
-            # the surrounding chain-of-thought.
+            # A thinking model may leave `content` empty and put its output in a
+            # reasoning channel; parse_json_object still recovers the JSON from it.
             content = (
                 message.get("reasoning_content") or message.get("reasoning") or ""
             ).strip()
@@ -203,10 +189,7 @@ class OpenAICompatibleClient(LLMClient):
 
 
 class OllamaClient(OpenAICompatibleClient):
-    """:class:`OpenAICompatibleClient` preset for Ollama's ``/v1`` endpoint.
-
-    Defaults to Ollama's local port and a Gemma-class model.
-    """
+    """LLM transport for a local Ollama server (default model ``gemma4:e2b``)."""
 
     def __init__(
         self,
@@ -236,12 +219,10 @@ class OllamaClient(OpenAICompatibleClient):
     def _raw_complete(
         self, system: str, prompt: str, *, stage: str | None = None
     ) -> str:
-        """Use Ollama's NATIVE ``/api/chat`` endpoint.
+        """Use Ollama's native ``/api/chat`` endpoint.
 
-        Unlike the OpenAI ``/v1`` shim, the native API reliably honors the
-        ``think`` flag — essential for a thinking model like gemma4:e4b on a CPU
-        runner, where leaving thinking on is slow and can bury/truncate the JSON
-        answer. The answer is returned directly in ``message.content``.
+        Unlike the OpenAI ``/v1`` shim, the native API honors the ``think`` flag,
+        and returns the answer directly in ``message.content``.
         """
         headers = {"Content-Type": "application/json"}
         url = f"{self._native_base}/api/chat"
