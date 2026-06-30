@@ -10,9 +10,14 @@ on:
   workflow_dispatch:
     inputs:
       model:
-        description: "Ollama model to run (CPU-friendly ~4B)"
+        description: "Ollama model to run (e.g. gemma4:e4b, gemma4:e2b)"
         required: false
         default: "gemma4:e4b"
+      think:
+        description: "enable bounded reasoning (--think); slower but helps 6d"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -71,12 +76,15 @@ jobs:
       - name: Run the Synapse sample against live Gemma
         run: |
           set -euo pipefail
+          THINK=""
+          if [ "${{ github.event.inputs.think }}" = "true" ]; then THINK="--think"; fi
+          echo "Reasoning: ${THINK:-off}"
           threat-delta analyze \
             --baseline examples/synapse/threat-model.yaml \
             --diff examples/synapse/pr-account-export.diff \
             --annotations examples/synapse/pr-account-export.annotations.json \
             --pr 17421 \
-            --llm ollama --llm-model "${{ github.event.inputs.model }}" \
+            --llm ollama --llm-model "${{ github.event.inputs.model }}" $THINK \
             --sarif "$RUNNER_TEMP/threat-delta.sarif" \
             --comment "$RUNNER_TEMP/threat-delta.md" \
             --json "$RUNNER_TEMP/deltas.json" | tee "$RUNNER_TEMP/stdout.txt"
