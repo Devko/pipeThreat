@@ -24,7 +24,10 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # gemma4:e4b is a *thinking* model: on a CPU runner it generates a long
+    # chain-of-thought per call, so the whole job can take ~20-30 min depending
+    # on the runner. Generous headroom keeps a slow runner from being killed.
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
 
