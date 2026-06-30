@@ -143,6 +143,31 @@ When a PR adds code no component claims, 6a emits an `untracked_path` delta with
 `proposed_baseline_update`; accepting it into the baseline closes the maintenance
 loop (spec §10) so the model stops re-flagging an accepted change.
 
+### Getting the *initial* baseline
+
+Authoring the first baseline is deliberately **not** the delta step's job (spec §1
+out of scope, §3 precondition). Three deterministic helpers make bootstrapping and
+upkeep easy — none of them call an LLM:
+
+```bash
+# 1. Scaffold a starter threat-model.yaml from the repo's directory layout.
+#    Review it, fill in the TODOs (trust zones, assets, assumptions), commit it.
+threat-delta init . --out threat-model.yaml
+
+# 2. Validate it as source — referential integrity, in CI on every change.
+threat-delta validate --baseline threat-model.yaml
+
+# 3. Measure completeness — which source paths no component covers yet.
+threat-delta coverage --baseline threat-model.yaml . --ext .py --show-paths
+```
+
+Recommended path: scaffold a skeleton with `init`, or commit a minimal baseline
+(`system` + `assets` + `assumptions`) and let the step's own `untracked_path`
+deltas tell you, PR by PR, which components to add ("bootstrap-by-drift"). Either
+way, `validate` it in CI and use `coverage` to close gaps deliberately. The
+baseline can also be drafted with a one-time, offline, *human-reviewed* LLM pass —
+the expensive whole-repo analysis we refuse to run per-PR is fine as a one-shot.
+
 ## Layout
 
 ```
@@ -161,7 +186,10 @@ threat_delta/
   emit.py          # 6e — SARIF 2.1.0 + PR comment markdown
   pipeline.py      # orchestration + 6e delta assembly
   step.py          # run_step() — standalone single-call pipeline entry point
-  cli.py           # command-line entry point
+  scaffold.py      # `init` — scaffold a starter baseline from the repo layout
+  validate.py      # `validate` — baseline referential-integrity checks
+  coverage.py      # `coverage` — source paths no component covers
+  cli.py           # command-line entry point (analyze/init/validate/coverage)
 examples/          # baseline + worked-example PR inputs (spec §12)
 tests/             # pytest suite (foundation + every stage + e2e worked example)
 ```

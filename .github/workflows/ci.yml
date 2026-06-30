@@ -24,6 +24,9 @@ jobs:
       - name: Run tests
         run: python -m pytest -q
 
+      - name: Validate the example baseline (baseline-as-code guard)
+        run: threat-delta validate --baseline examples/threat-model.yaml
+
       - name: Smoke-test the CLI on the bundled example
         run: |
           threat-delta \

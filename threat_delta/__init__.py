@@ -33,6 +33,9 @@ from .baseline import Baseline, BaselineError, load_baseline, parse_baseline
 from .llm import LLMClient, LLMConfig, LLMError, ScriptedLLMClient, SYSTEM_PREAMBLE
 from .pipeline import AnalysisResult, analyze
 from .step import needs_human_review, run_step
+from .scaffold import ScaffoldComponent, discover_components, init_baseline, render_baseline
+from .validate import Issue, has_errors, validate_baseline, validate_file
+from .coverage import CoverageReport, collect_source_paths, compute_coverage, format_report
 
 __version__ = "0.1.0"
 
@@ -50,5 +53,9 @@ __all__ = [
     "AnalysisResult", "analyze",
     # standalone step entry point
     "run_step", "needs_human_review",
+    # baseline bootstrapping / maintenance tooling
+    "ScaffoldComponent", "discover_components", "init_baseline", "render_baseline",
+    "Issue", "has_errors", "validate_baseline", "validate_file",
+    "CoverageReport", "collect_source_paths", "compute_coverage", "format_report",
     "__version__",
 ]
