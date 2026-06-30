@@ -86,3 +86,47 @@ def test_coverage_fail_under(tmp_path, capsys):
     assert rc == 1
     out = capsys.readouterr().out
     assert "Coverage:" in out
+
+
+def test_analyze_with_stub_transport(tmp_path):
+    # The --llm option flows through build_client; stub stays conservative.
+    bl = _write_baseline(tmp_path)
+    diff = tmp_path / "pr.diff"
+    diff.write_text(
+        "diff --git a/src/users/u.py b/src/users/u.py\n"
+        "--- a/src/users/u.py\n+++ b/src/users/u.py\n@@ -1 +1 @@\n-a\n+b\n",
+        encoding="utf-8",
+    )
+    assert main(["analyze", "--baseline", str(bl), "--diff", str(diff), "--llm", "stub"]) == 0
+
+
+def test_unknown_llm_rejected(tmp_path):
+    bl = _write_baseline(tmp_path)
+    diff = tmp_path / "pr.diff"
+    diff.write_text("diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n", encoding="utf-8")
+    # argparse choices reject an unknown transport (exits with SystemExit code 2).
+    import pytest
+
+    with pytest.raises(SystemExit):
+        main(["analyze", "--baseline", str(bl), "--diff", str(diff), "--llm", "bogus"])
+
+
+def test_init_llm_assisted_via_cli(tmp_path, monkeypatch):
+    # init --llm ollama should route through the LLM-assisted path. We stub the
+    # client builder so no server is needed, and a scripted client drives it.
+    from threat_delta.llm import ScriptedLLMClient
+    import threat_delta.cli as cli
+
+    (tmp_path / "src" / "gateway").mkdir(parents=True)
+    (tmp_path / "src" / "gateway" / "app.py").write_text("def handler(): ...\n", encoding="utf-8")
+    scripted = ScriptedLLMClient(
+        default={"trust_zone": "dmz", "handles_assets": ["Session token"], "entry_points": ["http_public"]}
+    )
+    monkeypatch.setattr(cli, "_build_llm", lambda args: scripted)
+
+    out = tmp_path / "threat-model.yaml"
+    assert main(["init", str(tmp_path), "--out", str(out), "--llm", "ollama"]) == 0
+    text = out.read_text()
+    assert "DRAFT" in text  # LLM-assisted output is a draft banner
+    # And it must still validate clean.
+    assert main(["validate", "--baseline", str(out)]) == 0

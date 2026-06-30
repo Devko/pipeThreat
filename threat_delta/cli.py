@@ -23,26 +23,40 @@ import json
 import sys
 
 from .coverage import collect_source_paths, compute_coverage, format_report
-from .llm import LLMClient, LLMConfig, ScriptedLLMClient
+from .llm import LLMClient
 from .scaffold import init_baseline
 from .step import needs_human_review, run_step
+from .transports import build_client
 from .validate import has_errors, validate_file
 
 
-def _build_llm(kind: str) -> LLMClient:
-    """Return an LLM client. Only the offline stub ships by default.
+def _build_llm(args: argparse.Namespace) -> LLMClient:
+    """Construct the LLM client from the shared --llm/--llm-* options.
 
-    A real local-model transport (llama.cpp / Ollama) implements
-    :class:`~threat_delta.llm.LLMClient` and can be selected here; until one is
-    configured, ``stub`` keeps the CLI runnable end-to-end and conservative
-    (it reports nothing rather than hallucinating).
+    ``stub`` (default) is the offline, conservative client (reports nothing
+    rather than hallucinating). ``ollama``/``openai`` target a local
+    OpenAI-compatible server running a Gemma-class model.
     """
-    if kind == "stub":
-        # Conservative default: every flag false, no violations. Produces only
-        # deterministic 6a untracked-path deltas. Replace with a real client to
-        # get 6b/6c/6d signal.
-        return ScriptedLLMClient(default={}, config=LLMConfig())
-    raise SystemExit(f"unknown --llm transport '{kind}' (only 'stub' is built in)")
+    try:
+        return build_client(
+            getattr(args, "llm", "stub"),
+            base_url=getattr(args, "llm_base_url", None),
+            model=getattr(args, "llm_model", None),
+        )
+    except ValueError as e:
+        raise SystemExit(str(e))
+
+
+def _add_llm_args(p: argparse.ArgumentParser) -> None:
+    """Shared model-transport options (used by analyze and init --llm)."""
+    p.add_argument(
+        "--llm",
+        default="stub",
+        choices=["stub", "ollama", "openai"],
+        help="LLM transport (default: stub — offline, reports nothing)",
+    )
+    p.add_argument("--llm-base-url", help="OpenAI-compatible server base URL")
+    p.add_argument("--llm-model", help="model name (e.g. gemma3:4b)")
 
 
 # --------------------------------------------------------------------------- #
@@ -66,6 +80,14 @@ def build_parser() -> argparse.ArgumentParser:
     i.add_argument("--out", help="write the skeleton here (default: stdout)")
     i.add_argument("--system-name", help="system name (default: repo dir name)")
     i.add_argument("--version", default="0.1.0", help="system version (default: 0.1.0)")
+    i.add_argument(
+        "--llm",
+        default="stub",
+        choices=["stub", "ollama", "openai"],
+        help="use an LLM to draft judgment fields (default: stub = deterministic only)",
+    )
+    i.add_argument("--llm-base-url", help="OpenAI-compatible server base URL")
+    i.add_argument("--llm-model", help="model name (e.g. gemma3:4b)")
 
     # validate ------------------------------------------------------------ #
     v = sub.add_parser("validate", help="check baseline referential integrity")
@@ -105,7 +127,7 @@ def _add_analyze_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--sarif", help="write SARIF 2.1.0 log to this path")
     p.add_argument("--comment", help="write the PR comment markdown to this path")
     p.add_argument("--json", dest="json_out", help="write the raw deltas JSON to this path")
-    p.add_argument("--llm", default="stub", help="LLM transport (default: stub)")
+    _add_llm_args(p)
     p.add_argument(
         "--max-hunk-chars",
         type=int,
@@ -134,7 +156,7 @@ def _cmd_analyze(args: argparse.Namespace) -> int:
         annotations=args.annotations,
         findings=args.findings,
         pr=args.pr,
-        llm=_build_llm(args.llm),
+        llm=_build_llm(args),
         max_hunk_chars=args.max_hunk_chars,
     )
 
@@ -166,17 +188,33 @@ def _cmd_analyze(args: argparse.Namespace) -> int:
 
 def _cmd_init(args: argparse.Namespace) -> int:
     try:
-        text = init_baseline(
-            args.root,
-            out=args.out,
-            system_name=args.system_name,
-            version=args.version,
-        )
+        if args.llm == "stub":
+            # Deterministic skeleton (directory layout only).
+            text = init_baseline(
+                args.root,
+                out=args.out,
+                system_name=args.system_name,
+                version=args.version,
+            )
+        else:
+            # LLM-assisted draft: deterministic discovers components/code_paths;
+            # the model fills the per-component judgment fields over bounded
+            # inputs. Output is a DRAFT requiring human review (spec §3).
+            from .scaffold_llm import init_baseline_llm
+
+            text = init_baseline_llm(
+                args.root,
+                _build_llm(args),
+                out=args.out,
+                system_name=args.system_name,
+                version=args.version,
+            )
     except FileExistsError as e:
         print(f"error: {e} (refusing to overwrite a committed baseline)", file=sys.stderr)
         return 1
     if args.out:
-        print(f"Wrote baseline skeleton to {args.out}", file=sys.stderr)
+        kind = "skeleton" if args.llm == "stub" else "LLM-assisted DRAFT"
+        print(f"Wrote baseline {kind} to {args.out}", file=sys.stderr)
         print("Review and edit it, then commit it as source (spec §3).", file=sys.stderr)
     else:
         print(text)

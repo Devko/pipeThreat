@@ -105,16 +105,50 @@ label + branch protection for a *human* gate (never a model gate).
 
 ---
 
-## Wiring a model
+## Wiring a model (Gemma)
 
-The CLI/action ship only an offline **stub** transport, which is conservative: it
-reports nothing rather than hallucinating, so everything runs end-to-end without a
-model server. To get real 6b/6c/6d signal, implement
-`threat_delta.llm.LLMClient._raw_complete` against your local model (llama.cpp
-server, Ollama, …) with `temperature=0` and a capped reasoning budget, then pass
-it to `run_step(llm=...)` or select it in `cli._build_llm`. The integration test
-(`tests/test_pipeline.py`) demonstrates the full §12 worked example with a
+Three transports ship in `threat_delta.transports` (stdlib only, no extra deps):
+
+| `--llm` | Client | Default endpoint / model |
+|---|---|---|
+| `stub` (default) | offline, reports nothing rather than hallucinating | — |
+| `ollama` | `OllamaClient` | `http://localhost:11434/v1`, `gemma3:4b` |
+| `openai` | `OpenAICompatibleClient` | any OpenAI-compatible `/chat/completions` (llama.cpp server, vLLM, LM Studio) |
+
+```bash
+# Run the analysis against a local Gemma via Ollama:
+threat-delta analyze --baseline threat-model.yaml --diff pr.diff \
+  --llm ollama --llm-model gemma3:4b
+```
+
+Or from Python:
+
+```python
+from threat_delta import run_step, build_client
+result = run_step(baseline="threat-model.yaml", diff="pr.diff",
+                  llm=build_client("ollama", model="gemma3:4b"))
+```
+
+**Reasoning is on but capped** (spec §2/§11): `temperature=0` and a *per-stage*
+reasoning budget — 6b classify `128`, 6c STRIDE `256`, 6d assumptions `384`
+tokens (`LLMConfig.stage_reasoning_budgets`, surfaced to the server as a
+`reasoning_effort` hint; `temperature`/`max_tokens` are always hard caps). Set
+`LLMConfig(reasoning=False)` to disable thinking entirely. Reasoning-API support
+varies by server, so the budget is best-effort; the caps are not. The integration
+test (`tests/test_pipeline.py`) demonstrates the full §12 worked example with a
 scripted client.
+
+### LLM-assisted baseline drafting
+
+`threat-delta init --llm ollama` drafts the *initial* baseline with the model
+instead of just a deterministic skeleton — a spec §3 one-time, offline,
+human-reviewed bootstrap. It stays bounded and on-philosophy: deterministic code
+discovers the components and `code_paths`; the model only fills the narrow
+judgment fields (`trust_zone`, handled assets, entry points) per component over a
+*small per-component code sample* — never the whole repo. Code (not the model)
+mints asset ids and resolves references, so the draft always passes `validate`.
+The output is labelled `DRAFT — HUMAN REVIEW REQUIRED`; review and commit it as
+source.
 
 ## How it works
 
@@ -186,7 +220,9 @@ threat_delta/
   emit.py          # 6e — SARIF 2.1.0 + PR comment markdown
   pipeline.py      # orchestration + 6e delta assembly
   step.py          # run_step() — standalone single-call pipeline entry point
+  transports.py    # real LLM clients (Ollama / OpenAI-compatible), stdlib-only
   scaffold.py      # `init` — scaffold a starter baseline from the repo layout
+  scaffold_llm.py  # `init --llm` — LLM-assisted baseline draft (bounded)
   validate.py      # `validate` — baseline referential-integrity checks
   coverage.py      # `coverage` — source paths no component covers
   cli.py           # command-line entry point (analyze/init/validate/coverage)

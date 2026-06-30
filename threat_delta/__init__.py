@@ -36,6 +36,8 @@ from .step import needs_human_review, run_step
 from .scaffold import ScaffoldComponent, discover_components, init_baseline, render_baseline
 from .validate import Issue, has_errors, validate_baseline, validate_file
 from .coverage import CoverageReport, collect_source_paths, compute_coverage, format_report
+from .transports import OllamaClient, OpenAICompatibleClient, build_client
+from .scaffold_llm import ComponentProposal, init_baseline_llm, propose_component
 
 __version__ = "0.1.0"
 
@@ -57,5 +59,8 @@ __all__ = [
     "ScaffoldComponent", "discover_components", "init_baseline", "render_baseline",
     "Issue", "has_errors", "validate_baseline", "validate_file",
     "CoverageReport", "collect_source_paths", "compute_coverage", "format_report",
+    # LLM transports + LLM-assisted scaffolding
+    "build_client", "OpenAICompatibleClient", "OllamaClient",
+    "init_baseline_llm", "propose_component", "ComponentProposal",
     "__version__",
 ]
