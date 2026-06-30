@@ -173,19 +173,25 @@ REQUIRED`. It is a one-time, offline bootstrap — review and commit it.
 
 ---
 
-## Worked example
+## Worked examples
 
-[`examples/synapse/`](examples/synapse/) runs the step end-to-end against
-[Matrix Synapse](https://github.com/element-hq/synapse): a PR adds a client
-endpoint that returns **any user's** account data by `user_id` with no auth check.
-The step flags it as **High severity, needs human review**, mapping it to
-InformationDisclosure / ElevationOfPrivilege and the violated `client_requires_token`
-and `user_scoped_access` assumptions — explaining *why it matters at the system
-level*, not just "missing auth decorator".
+Two end-to-end runs against real open-source projects (deterministic, generated
+with a scripted model — each has a `generate_report.py` you can re-run, or run live
+with `--llm ollama`):
 
-See the generated [PR comment](examples/synapse/report/threat-delta.md) and
-[SARIF](examples/synapse/report/threat-delta.sarif), or regenerate with
-`python examples/synapse/generate_report.py`.
+- **[`examples/synapse/`](examples/synapse/)** — Matrix Synapse (Python). A PR adds
+  a client endpoint returning **any user's** account data by `user_id` with no auth
+  check → InformationDisclosure / ElevationOfPrivilege and violated
+  `client_requires_token` / `user_scoped_access` assumptions.
+- **[`examples/vault/`](examples/vault/)** — HashiCorp Vault (Go). A PR adds a debug
+  endpoint that returns raw secrets straight from storage, bypassing token, ACL, and
+  audit → InformationDisclosure / ElevationOfPrivilege / **Repudiation** (the audit
+  bypass) and three violated assumptions.
+
+Each is flagged **High severity, needs human review** — explaining *why a change
+matters at the system level*, not just "missing auth check". See, e.g., the
+generated [Synapse PR comment](examples/synapse/report/threat-delta.md) and
+[Vault PR comment](examples/vault/report/threat-delta.md).
 
 ---
 

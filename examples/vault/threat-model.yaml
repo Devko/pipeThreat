@@ -1,0 +1,124 @@
+# Illustrative threat-model baseline for HashiCorp Vault (github.com/hashicorp/vault).
+#
+# A DEMONSTRATION baseline showing the Threat-Model Delta step on a real Go
+# project. Components and code_paths mirror Vault's actual package layout
+# (http/, vault/, audit/, physical/, builtin/), but the model is intentionally
+# small and is not an authoritative threat model for the project.
+system:
+  name: vault
+  version: "demo"
+  description: Secrets management — API, policy enforcement, secret engines, storage.
+
+assets:
+  - id: asset.secrets
+    name: Stored secrets (KV / engine data)
+    sensitivity: critical
+  - id: asset.tokens
+    name: Auth tokens (incl. root)
+    sensitivity: critical
+  - id: asset.encryption_keys
+    name: Barrier / encryption keys
+    sensitivity: critical
+  - id: asset.policies
+    name: ACL policies
+    sensitivity: high
+  - id: asset.audit_log
+    name: Audit log
+    sensitivity: high
+
+trust_boundaries:
+  - id: tb.internet_edge
+    name: Client to API
+    description: External clients reaching the Vault HTTP API.
+    controls: [tls, listener]
+  - id: tb.authn
+    name: Unauthenticated to Authenticated
+    description: A request becomes authenticated by presenting a valid token.
+    controls: [token_auth]
+  - id: tb.authz
+    name: Authenticated to Authorized
+    description: An authenticated request is checked against ACL policy before access.
+    controls: [acl_policy_check]
+  - id: tb.barrier
+    name: Core to Storage
+    description: Data crosses the cryptographic barrier to/from physical storage.
+    controls: [encryption_barrier]
+
+components:
+  - id: comp.http_api
+    name: HTTP API
+    trust_zone: edge
+    code_paths: ["http/**"]
+    handles_assets: [asset.tokens]
+    entry_points: [http_api]
+  - id: comp.core
+    name: Core / request router
+    trust_zone: internal
+    code_paths: ["vault/core.go", "vault/router.go", "vault/request_handling.go"]
+    handles_assets: [asset.tokens]
+    entry_points: []
+  - id: comp.policy
+    name: Policy / ACL enforcement
+    trust_zone: internal
+    code_paths: ["vault/acl.go", "vault/policy_store.go"]
+    handles_assets: [asset.policies]
+    entry_points: []
+  - id: comp.secret_engines
+    name: Secret engines
+    trust_zone: internal
+    code_paths: ["builtin/logical/**", "vault/logical_system.go"]
+    handles_assets: [asset.secrets]
+    entry_points: []
+  - id: comp.audit
+    name: Audit logging
+    trust_zone: internal
+    code_paths: ["audit/**"]
+    handles_assets: [asset.audit_log]
+    entry_points: []
+  - id: comp.storage
+    name: Storage barrier
+    trust_zone: internal
+    code_paths: ["physical/**", "vault/barrier.go", "vault/barrier_aes_gcm.go"]
+    handles_assets: [asset.encryption_keys, asset.secrets]
+    entry_points: []
+
+data_flows:
+  - id: flow.request
+    from: comp.http_api
+    to: comp.core
+    crosses: [tb.authn]
+    assets: [asset.tokens]
+  - id: flow.read_secret
+    from: comp.secret_engines
+    to: comp.storage
+    crosses: [tb.barrier]
+    assets: [asset.secrets]
+  - id: flow.audit
+    from: comp.core
+    to: comp.audit
+    crosses: []
+    assets: [asset.audit_log]
+
+assumptions:
+  - id: asm.all_requests_authenticated
+    statement: >-
+      Every API request requires a valid token, except the small documented
+      unauthenticated set (login, sys/health, sys/seal-status).
+  - id: asm.acl_enforced
+    statement: >-
+      Every authenticated request is checked against ACL policy before it can
+      read or write a path; no path bypasses policy enforcement.
+  - id: asm.all_access_audited
+    statement: >-
+      Every request that reads or writes secret data is written to the audit log
+      before the response is returned.
+  - id: asm.secrets_encrypted_at_rest
+    statement: >-
+      Secrets and keys are only written to storage through the encryption
+      barrier; raw storage values are never returned to clients.
+
+accepted_risks:
+  - id: risk.root_token_bypass
+    statement: >-
+      The root token bypasses all ACL policies by design; mitigated by
+      operational controls around its issuance and use.

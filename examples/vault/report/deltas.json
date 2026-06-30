@@ -1,0 +1,185 @@
+{
+  "pr": "29101",
+  "deltas": [
+    {
+      "delta_id": "td-29101-1",
+      "pr": "29101",
+      "type": "assumption_violation",
+      "affected_elements": [
+        "comp.http_api"
+      ],
+      "stride": [],
+      "contradicts_assumption": "asm.acl_enforced",
+      "severity": "high",
+      "confidence": "medium",
+      "evidence": {
+        "files": [
+          "http/sys_inspect.go"
+        ],
+        "entry_points": [
+          "http_api"
+        ]
+      },
+      "description": "Change weakens or violates assumption 'asm.acl_enforced': reads storage directly with no ACL policy evaluation",
+      "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+      "requires_human_review": true,
+      "proposed_baseline_update": {
+        "kind": "assumption_revisited",
+        "target": "asm.acl_enforced",
+        "change": "confirm intended; update or reaffirm the assumption"
+      }
+    },
+    {
+      "delta_id": "td-29101-2",
+      "pr": "29101",
+      "type": "assumption_violation",
+      "affected_elements": [
+        "comp.http_api"
+      ],
+      "stride": [],
+      "contradicts_assumption": "asm.all_access_audited",
+      "severity": "high",
+      "confidence": "medium",
+      "evidence": {
+        "files": [
+          "http/sys_inspect.go"
+        ],
+        "entry_points": [
+          "http_api"
+        ]
+      },
+      "description": "Change weakens or violates assumption 'asm.all_access_audited': returns secret data without writing an audit entry",
+      "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+      "requires_human_review": true,
+      "proposed_baseline_update": {
+        "kind": "assumption_revisited",
+        "target": "asm.all_access_audited",
+        "change": "confirm intended; update or reaffirm the assumption"
+      }
+    },
+    {
+      "delta_id": "td-29101-3",
+      "pr": "29101",
+      "type": "assumption_violation",
+      "affected_elements": [
+        "comp.http_api"
+      ],
+      "stride": [],
+      "contradicts_assumption": "asm.all_requests_authenticated",
+      "severity": "high",
+      "confidence": "medium",
+      "evidence": {
+        "files": [
+          "http/sys_inspect.go"
+        ],
+        "entry_points": [
+          "http_api"
+        ]
+      },
+      "description": "Change weakens or violates assumption 'asm.all_requests_authenticated': new endpoint requires no token",
+      "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+      "requires_human_review": true,
+      "proposed_baseline_update": {
+        "kind": "assumption_revisited",
+        "target": "asm.all_requests_authenticated",
+        "change": "confirm intended; update or reaffirm the assumption"
+      }
+    },
+    {
+      "delta_id": "td-29101-4",
+      "pr": "29101",
+      "type": "control_change",
+      "affected_elements": [
+        "comp.http_api"
+      ],
+      "stride": [
+        "InformationDisclosure",
+        "ElevationOfPrivilege",
+        "Repudiation"
+      ],
+      "contradicts_assumption": null,
+      "severity": "high",
+      "confidence": "medium",
+      "evidence": {
+        "files": [
+          "http/sys_inspect.go"
+        ],
+        "entry_points": [
+          "http_api"
+        ]
+      },
+      "description": "Control change on HTTP API (edge zone). STRIDE: InformationDisclosure: returns raw decrypted secrets read straight from the storage barrier; ElevationOfPrivilege: reads any storage path with no token and no ACL policy check; Repudiation: secret access is not written to the audit log",
+      "recommended_action": "Review the changed/removed control; restore it or document the compensating control in the baseline.",
+      "requires_human_review": true,
+      "proposed_baseline_update": {
+        "kind": "control_changed",
+        "target": "comp.http_api",
+        "change": "review controls affecting comp.http_api"
+      }
+    },
+    {
+      "delta_id": "td-29101-5",
+      "pr": "29101",
+      "type": "new_entry_point",
+      "affected_elements": [
+        "comp.http_api"
+      ],
+      "stride": [
+        "InformationDisclosure",
+        "ElevationOfPrivilege",
+        "Repudiation"
+      ],
+      "contradicts_assumption": null,
+      "severity": "high",
+      "confidence": "medium",
+      "evidence": {
+        "files": [
+          "http/sys_inspect.go"
+        ],
+        "entry_points": [
+          "http_api"
+        ]
+      },
+      "description": "New entry point on HTTP API (edge zone). STRIDE: InformationDisclosure: returns raw decrypted secrets read straight from the storage barrier; ElevationOfPrivilege: reads any storage path with no token and no ACL policy check; Repudiation: secret access is not written to the audit log",
+      "recommended_action": "Confirm the new entry point is intended; add explicit authz + input validation, or route it through the gateway.",
+      "requires_human_review": true,
+      "proposed_baseline_update": {
+        "kind": "component_entry_point_added",
+        "target": "comp.http_api",
+        "change": "entry_points += http_api"
+      }
+    },
+    {
+      "delta_id": "td-29101-6",
+      "pr": "29101",
+      "type": "trust_boundary_crossing",
+      "affected_elements": [
+        "comp.http_api"
+      ],
+      "stride": [
+        "InformationDisclosure",
+        "ElevationOfPrivilege",
+        "Repudiation"
+      ],
+      "contradicts_assumption": null,
+      "severity": "high",
+      "confidence": "medium",
+      "evidence": {
+        "files": [
+          "http/sys_inspect.go"
+        ],
+        "entry_points": [
+          "http_api"
+        ]
+      },
+      "description": "Trust-boundary crossing on HTTP API (edge zone). STRIDE: InformationDisclosure: returns raw decrypted secrets read straight from the storage barrier; ElevationOfPrivilege: reads any storage path with no token and no ACL policy check; Repudiation: secret access is not written to the audit log",
+      "recommended_action": "Verify the crossing is authorized and that the boundary's controls (authn/authz, validation) apply to the new path.",
+      "requires_human_review": true,
+      "proposed_baseline_update": {
+        "kind": "trust_boundary_crossing_added",
+        "target": "comp.http_api",
+        "change": "document the new boundary crossing for comp.http_api"
+      }
+    }
+  ]
+}

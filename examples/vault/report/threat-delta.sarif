@@ -1,0 +1,284 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "threat-model-delta",
+          "informationUri": "https://github.com/Devko/pipeThreat",
+          "rules": [
+            {
+              "id": "assumption_violation",
+              "name": "AssumptionViolation",
+              "shortDescription": {
+                "text": "assumption violation"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "helpUri": "https://github.com/Devko/pipeThreat/blob/main/docs/deltas.md#assumption_violation"
+            },
+            {
+              "id": "control_change",
+              "name": "ControlChange",
+              "shortDescription": {
+                "text": "control change"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "helpUri": "https://github.com/Devko/pipeThreat/blob/main/docs/deltas.md#control_change"
+            },
+            {
+              "id": "new_entry_point",
+              "name": "NewEntryPoint",
+              "shortDescription": {
+                "text": "new entry point"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "helpUri": "https://github.com/Devko/pipeThreat/blob/main/docs/deltas.md#new_entry_point"
+            },
+            {
+              "id": "trust_boundary_crossing",
+              "name": "TrustBoundaryCrossing",
+              "shortDescription": {
+                "text": "trust boundary crossing"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "helpUri": "https://github.com/Devko/pipeThreat/blob/main/docs/deltas.md#trust_boundary_crossing"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "assumption_violation",
+          "level": "warning",
+          "message": {
+            "text": "Change weakens or violates assumption 'asm.acl_enforced': reads storage directly with no ACL policy evaluation"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http/sys_inspect.go"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-29101-1"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [],
+            "contradicts_assumption": "asm.acl_enforced",
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.http_api"
+            ],
+            "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+            "proposed_baseline_update": {
+              "kind": "assumption_revisited",
+              "target": "asm.acl_enforced",
+              "change": "confirm intended; update or reaffirm the assumption"
+            }
+          }
+        },
+        {
+          "ruleId": "assumption_violation",
+          "level": "warning",
+          "message": {
+            "text": "Change weakens or violates assumption 'asm.all_access_audited': returns secret data without writing an audit entry"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http/sys_inspect.go"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-29101-2"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [],
+            "contradicts_assumption": "asm.all_access_audited",
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.http_api"
+            ],
+            "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+            "proposed_baseline_update": {
+              "kind": "assumption_revisited",
+              "target": "asm.all_access_audited",
+              "change": "confirm intended; update or reaffirm the assumption"
+            }
+          }
+        },
+        {
+          "ruleId": "assumption_violation",
+          "level": "warning",
+          "message": {
+            "text": "Change weakens or violates assumption 'asm.all_requests_authenticated': new endpoint requires no token"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http/sys_inspect.go"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-29101-3"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [],
+            "contradicts_assumption": "asm.all_requests_authenticated",
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.http_api"
+            ],
+            "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+            "proposed_baseline_update": {
+              "kind": "assumption_revisited",
+              "target": "asm.all_requests_authenticated",
+              "change": "confirm intended; update or reaffirm the assumption"
+            }
+          }
+        },
+        {
+          "ruleId": "control_change",
+          "level": "warning",
+          "message": {
+            "text": "Control change on HTTP API (edge zone). STRIDE: InformationDisclosure: returns raw decrypted secrets read straight from the storage barrier; ElevationOfPrivilege: reads any storage path with no token and no ACL policy check; Repudiation: secret access is not written to the audit log"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http/sys_inspect.go"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-29101-4"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [
+              "InformationDisclosure",
+              "ElevationOfPrivilege",
+              "Repudiation"
+            ],
+            "contradicts_assumption": null,
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.http_api"
+            ],
+            "recommended_action": "Review the changed/removed control; restore it or document the compensating control in the baseline.",
+            "proposed_baseline_update": {
+              "kind": "control_changed",
+              "target": "comp.http_api",
+              "change": "review controls affecting comp.http_api"
+            }
+          }
+        },
+        {
+          "ruleId": "new_entry_point",
+          "level": "warning",
+          "message": {
+            "text": "New entry point on HTTP API (edge zone). STRIDE: InformationDisclosure: returns raw decrypted secrets read straight from the storage barrier; ElevationOfPrivilege: reads any storage path with no token and no ACL policy check; Repudiation: secret access is not written to the audit log"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http/sys_inspect.go"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-29101-5"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [
+              "InformationDisclosure",
+              "ElevationOfPrivilege",
+              "Repudiation"
+            ],
+            "contradicts_assumption": null,
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.http_api"
+            ],
+            "recommended_action": "Confirm the new entry point is intended; add explicit authz + input validation, or route it through the gateway.",
+            "proposed_baseline_update": {
+              "kind": "component_entry_point_added",
+              "target": "comp.http_api",
+              "change": "entry_points += http_api"
+            }
+          }
+        },
+        {
+          "ruleId": "trust_boundary_crossing",
+          "level": "warning",
+          "message": {
+            "text": "Trust-boundary crossing on HTTP API (edge zone). STRIDE: InformationDisclosure: returns raw decrypted secrets read straight from the storage barrier; ElevationOfPrivilege: reads any storage path with no token and no ACL policy check; Repudiation: secret access is not written to the audit log"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http/sys_inspect.go"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-29101-6"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [
+              "InformationDisclosure",
+              "ElevationOfPrivilege",
+              "Repudiation"
+            ],
+            "contradicts_assumption": null,
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.http_api"
+            ],
+            "recommended_action": "Verify the crossing is authorized and that the boundary's controls (authn/authz, validation) apply to the new path.",
+            "proposed_baseline_update": {
+              "kind": "trust_boundary_crossing_added",
+              "target": "comp.http_api",
+              "change": "document the new boundary crossing for comp.http_api"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
