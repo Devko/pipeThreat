@@ -48,6 +48,16 @@ inputs:
     description: "Per-component hunk budget for the STRIDE call."
     required: false
     default: "4000"
+  llm:
+    description: >-
+      LLM transport: 'stub' (default — deterministic only, no model) or 'ollama'
+      (provision a local Gemma-class model on the runner for real 6b/6c/6d signal).
+    required: false
+    default: "stub"
+  llm-model:
+    description: "Ollama model to pull/run when llm=ollama (CPU-friendly ~4B)."
+    required: false
+    default: "gemma3:4b"
   python-version:
     description: "Python version to set up."
     required: false
@@ -72,6 +82,34 @@ runs:
     - name: Install threat-delta (from this action's repo)
       shell: bash
       run: pip install "${{ github.action_path }}"
+
+    # --- Optional: provision a local Gemma model on the runner ------------- #
+    # Only runs when llm=ollama. The model weights are cached so only the first
+    # run on a given model pays the ~3GB download. A 4B quantized model runs on
+    # the CPU-only GitHub runner — slow per call, but the step makes only 3-5
+    # calls per PR and is async/non-blocking (spec's "CPU-only CI runner, ~4B").
+    - name: Cache Ollama model
+      if: ${{ inputs.llm == 'ollama' }}
+      uses: actions/cache@v4
+      with:
+        path: ~/.ollama/models
+        key: ollama-${{ inputs.llm-model }}
+
+    - name: Provision Ollama + model
+      if: ${{ inputs.llm == 'ollama' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! command -v ollama >/dev/null 2>&1; then
+          curl -fsSL https://ollama.com/install.sh | sh
+        fi
+        # Start the server in the background and wait for it to answer.
+        ollama serve >"${RUNNER_TEMP:-/tmp}/ollama.log" 2>&1 &
+        for i in $(seq 1 30); do
+          curl -fsS http://localhost:11434/api/tags >/dev/null 2>&1 && break
+          sleep 1
+        done
+        ollama pull "${{ inputs.llm-model }}"
 
     - name: Resolve PR diff
       id: diff
@@ -100,8 +138,10 @@ runs:
               --diff "${{ steps.diff.outputs.path }}"
               --pr "$PR"
               --max-hunk-chars "${{ inputs.max-hunk-chars }}"
+              --llm "${{ inputs.llm }}"
               --sarif "$OUT/threat-delta.sarif"
               --comment "$OUT/threat-delta.md")
+        if [ "${{ inputs.llm }}" = "ollama" ]; then ARGS+=(--llm-model "${{ inputs.llm-model }}"); fi
         if [ -n "${{ inputs.annotations }}" ]; then ARGS+=(--annotations "${{ inputs.annotations }}"); fi
         if [ -n "${{ inputs.findings }}" ]; then ARGS+=(--findings "${{ inputs.findings }}"); fi
         if [ "${{ inputs.fail-on-high }}" = "true" ]; then ARGS+=(--fail-on-high); fi

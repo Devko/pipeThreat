@@ -129,6 +129,28 @@ result = run_step(baseline="threat-model.yaml", diff="pr.diff",
                   llm=build_client("ollama", model="gemma3:4b"))
 ```
 
+### Running Gemma in CI
+
+By default the GitHub Action runs the `stub` (deterministic only) — it does **not**
+provision a model, so out of the box CI emits only `untracked_path` deltas. To get
+real 6b/6c/6d signal, switch the action to provision a local Gemma on the runner:
+
+```yaml
+- uses: Devko/pipeThreat@main
+  with:
+    baseline: threat-model.yaml
+    llm: ollama
+    llm-model: gemma3:4b
+```
+
+The action then installs Ollama, **caches** the model weights (so only the first
+run pays the ~3 GB pull), serves it, and points the step at it. A 4 B quantized
+model runs on the standard CPU-only `ubuntu-latest` runner — slow per call (tens
+of seconds), but the step makes only 3–5 calls per PR and is async/non-blocking,
+which is exactly the spec's runtime target ("CPU-only CI runner, local ~4B"). For
+faster turnaround, point `--llm openai`/the action at a self-hosted runner or an
+internal OpenAI-compatible endpoint instead.
+
 **Reasoning is on but capped** (spec §2/§11): `temperature=0` and a *per-stage*
 reasoning budget — 6b classify `128`, 6c STRIDE `256`, 6d assumptions `384`
 tokens (`LLMConfig.stage_reasoning_budgets`, surfaced to the server as a
