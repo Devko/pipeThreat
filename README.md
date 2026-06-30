@@ -175,23 +175,20 @@ REQUIRED`. It is a one-time, offline bootstrap — review and commit it.
 
 ## Worked examples
 
-Two end-to-end runs against real open-source projects (deterministic, generated
-with a scripted model — each has a `generate_report.py` you can re-run, or run live
-with `--llm ollama`):
+Three end-to-end runs against real open-source projects, in three languages
+(deterministic, generated with a scripted model — each has a `generate_report.py`
+you can re-run, or run live with `--llm ollama`):
 
-- **[`examples/synapse/`](examples/synapse/)** — Matrix Synapse (Python). A PR adds
-  a client endpoint returning **any user's** account data by `user_id` with no auth
-  check → InformationDisclosure / ElevationOfPrivilege and violated
-  `client_requires_token` / `user_scoped_access` assumptions.
-- **[`examples/vault/`](examples/vault/)** — HashiCorp Vault (Go). A PR adds a debug
-  endpoint that returns raw secrets straight from storage, bypassing token, ACL, and
-  audit → InformationDisclosure / ElevationOfPrivilege / **Repudiation** (the audit
-  bypass) and three violated assumptions.
+| Example | Language | The PR | STRIDE surfaced |
+|---|---|---|---|
+| [Matrix Synapse](examples/synapse/) | Python | Client endpoint returns any user's account data, no auth | InfoDisclosure · ElevationOfPrivilege · Spoofing |
+| [HashiCorp Vault](examples/vault/) | Go | Debug endpoint returns raw secrets from storage, bypassing token/ACL/audit | InfoDisclosure · ElevationOfPrivilege · **Repudiation** |
+| [n8n](examples/n8n/) | TypeScript | Unauthenticated public webhook executes workflows | **Spoofing · Tampering · DenialOfService** · ElevationOfPrivilege |
 
-Each is flagged **High severity, needs human review** — explaining *why a change
-matters at the system level*, not just "missing auth check". See, e.g., the
-generated [Synapse PR comment](examples/synapse/report/threat-delta.md) and
-[Vault PR comment](examples/vault/report/threat-delta.md).
+Each explains *why a change matters at the system level* — not just "missing auth
+check" — and maps it to violated assumptions with deterministic severity (the n8n
+example shows tiered High + Medium in one report). The same machinery resolves
+`code_paths` in each language with no per-language logic.
 
 ---
 

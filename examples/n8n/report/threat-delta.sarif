@@ -1,0 +1,287 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "threat-model-delta",
+          "informationUri": "https://github.com/Devko/pipeThreat",
+          "rules": [
+            {
+              "id": "assumption_violation",
+              "name": "AssumptionViolation",
+              "shortDescription": {
+                "text": "assumption violation"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "helpUri": "https://github.com/Devko/pipeThreat/blob/main/docs/deltas.md#assumption_violation"
+            },
+            {
+              "id": "control_change",
+              "name": "ControlChange",
+              "shortDescription": {
+                "text": "control change"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "helpUri": "https://github.com/Devko/pipeThreat/blob/main/docs/deltas.md#control_change"
+            },
+            {
+              "id": "new_entry_point",
+              "name": "NewEntryPoint",
+              "shortDescription": {
+                "text": "new entry point"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "helpUri": "https://github.com/Devko/pipeThreat/blob/main/docs/deltas.md#new_entry_point"
+            },
+            {
+              "id": "trust_boundary_crossing",
+              "name": "TrustBoundaryCrossing",
+              "shortDescription": {
+                "text": "trust boundary crossing"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "helpUri": "https://github.com/Devko/pipeThreat/blob/main/docs/deltas.md#trust_boundary_crossing"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "assumption_violation",
+          "level": "warning",
+          "message": {
+            "text": "Change weakens or violates assumption 'asm.no_unauthenticated_execution': an anonymous request triggers workflow execution"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/cli/src/webhooks/PublicTriggerHandler.ts"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-8421-1"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [],
+            "contradicts_assumption": "asm.no_unauthenticated_execution",
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.webhooks"
+            ],
+            "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+            "proposed_baseline_update": {
+              "kind": "assumption_revisited",
+              "target": "asm.no_unauthenticated_execution",
+              "change": "confirm intended; update or reaffirm the assumption"
+            }
+          }
+        },
+        {
+          "ruleId": "assumption_violation",
+          "level": "warning",
+          "message": {
+            "text": "Change weakens or violates assumption 'asm.public_endpoints_rate_limited': the public endpoint applies no rate limit"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/cli/src/webhooks/PublicTriggerHandler.ts"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-8421-2"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [],
+            "contradicts_assumption": "asm.public_endpoints_rate_limited",
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.webhooks"
+            ],
+            "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+            "proposed_baseline_update": {
+              "kind": "assumption_revisited",
+              "target": "asm.public_endpoints_rate_limited",
+              "change": "confirm intended; update or reaffirm the assumption"
+            }
+          }
+        },
+        {
+          "ruleId": "assumption_violation",
+          "level": "warning",
+          "message": {
+            "text": "Change weakens or violates assumption 'asm.webhooks_authenticated': endpoint verifies no token or signature"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/cli/src/webhooks/PublicTriggerHandler.ts"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-8421-3"
+          },
+          "properties": {
+            "severity": "high",
+            "confidence": "medium",
+            "stride": [],
+            "contradicts_assumption": "asm.webhooks_authenticated",
+            "requires_human_review": true,
+            "affected_elements": [
+              "comp.webhooks"
+            ],
+            "recommended_action": "Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.",
+            "proposed_baseline_update": {
+              "kind": "assumption_revisited",
+              "target": "asm.webhooks_authenticated",
+              "change": "confirm intended; update or reaffirm the assumption"
+            }
+          }
+        },
+        {
+          "ruleId": "control_change",
+          "level": "warning",
+          "message": {
+            "text": "Control change on Webhook receiver (edge zone). STRIDE: Spoofing: no authentication or signature check \u2014 any caller can trigger a workflow; Tampering: attacker-controlled request body is passed straight in as workflow trigger data; DenialOfService: unauthenticated synchronous execution with no rate limit; ElevationOfPrivilege: triggers workflows that run with stored credentials"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/cli/src/webhooks/PublicTriggerHandler.ts"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-8421-4"
+          },
+          "properties": {
+            "severity": "medium",
+            "confidence": "medium",
+            "stride": [
+              "Spoofing",
+              "Tampering",
+              "DenialOfService",
+              "ElevationOfPrivilege"
+            ],
+            "contradicts_assumption": null,
+            "requires_human_review": false,
+            "affected_elements": [
+              "comp.webhooks"
+            ],
+            "recommended_action": "Review the changed/removed control; restore it or document the compensating control in the baseline.",
+            "proposed_baseline_update": {
+              "kind": "control_changed",
+              "target": "comp.webhooks",
+              "change": "review controls affecting comp.webhooks"
+            }
+          }
+        },
+        {
+          "ruleId": "new_entry_point",
+          "level": "warning",
+          "message": {
+            "text": "New entry point on Webhook receiver (edge zone). STRIDE: Spoofing: no authentication or signature check \u2014 any caller can trigger a workflow; Tampering: attacker-controlled request body is passed straight in as workflow trigger data; DenialOfService: unauthenticated synchronous execution with no rate limit; ElevationOfPrivilege: triggers workflows that run with stored credentials"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/cli/src/webhooks/PublicTriggerHandler.ts"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-8421-5"
+          },
+          "properties": {
+            "severity": "medium",
+            "confidence": "medium",
+            "stride": [
+              "Spoofing",
+              "Tampering",
+              "DenialOfService",
+              "ElevationOfPrivilege"
+            ],
+            "contradicts_assumption": null,
+            "requires_human_review": false,
+            "affected_elements": [
+              "comp.webhooks"
+            ],
+            "recommended_action": "Confirm the new entry point is intended; add explicit authz + input validation, or route it through the gateway.",
+            "proposed_baseline_update": {
+              "kind": "component_entry_point_added",
+              "target": "comp.webhooks",
+              "change": "entry_points += http_webhook"
+            }
+          }
+        },
+        {
+          "ruleId": "trust_boundary_crossing",
+          "level": "warning",
+          "message": {
+            "text": "Trust-boundary crossing on Webhook receiver (edge zone). STRIDE: Spoofing: no authentication or signature check \u2014 any caller can trigger a workflow; Tampering: attacker-controlled request body is passed straight in as workflow trigger data; DenialOfService: unauthenticated synchronous execution with no rate limit; ElevationOfPrivilege: triggers workflows that run with stored credentials"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/cli/src/webhooks/PublicTriggerHandler.ts"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "deltaId": "td-8421-6"
+          },
+          "properties": {
+            "severity": "medium",
+            "confidence": "medium",
+            "stride": [
+              "Spoofing",
+              "Tampering",
+              "DenialOfService",
+              "ElevationOfPrivilege"
+            ],
+            "contradicts_assumption": null,
+            "requires_human_review": false,
+            "affected_elements": [
+              "comp.webhooks"
+            ],
+            "recommended_action": "Verify the crossing is authorized and that the boundary's controls (authn/authz, validation) apply to the new path.",
+            "proposed_baseline_update": {
+              "kind": "trust_boundary_crossing_added",
+              "target": "comp.webhooks",
+              "change": "document the new boundary crossing for comp.webhooks"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

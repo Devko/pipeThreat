@@ -1,0 +1,8 @@
+[
+  {
+    "path": "packages/cli/src/webhooks/PublicTriggerHandler.ts",
+    "entry_points": ["http_webhook"],
+    "untrusted_inputs": ["req.params.workflowId", "req.body"],
+    "sinks": ["WorkflowRepository.findOneBy", "WorkflowRunner.run"]
+  }
+]

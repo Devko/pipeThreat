@@ -1,0 +1,97 @@
+# Illustrative threat-model baseline for n8n (github.com/n8n-io/n8n).
+#
+# A DEMONSTRATION baseline showing the Threat-Model Delta step on a real
+# TypeScript/Node project. Components and code_paths mirror n8n's monorepo layout
+# (packages/cli, packages/core, packages/nodes-base), but the model is
+# intentionally small and is not an authoritative threat model for the project.
+system:
+  name: n8n
+  version: "demo"
+  description: Workflow automation — REST API, webhook triggers, node execution, credentials.
+
+assets:
+  - id: asset.credentials
+    name: Stored third-party credentials
+    sensitivity: critical
+  - id: asset.workflow_data
+    name: Workflow definitions & execution data
+    sensitivity: high
+  - id: asset.user_session
+    name: User sessions / API keys
+    sensitivity: high
+
+trust_boundaries:
+  - id: tb.internet_edge
+    name: Internet to API
+    description: External clients reaching the n8n REST API.
+    controls: [tls, session_auth]
+  - id: tb.webhook_ingress
+    name: Untrusted caller to workflow trigger
+    description: An external caller triggering a workflow via a webhook.
+    controls: [webhook_auth, signature_verification, rate_limit]
+  - id: tb.node_execution
+    name: Workflow data to node execution
+    description: Workflow data flowing into node execution that uses credentials.
+    controls: [credential_scoping]
+
+components:
+  - id: comp.webhooks
+    name: Webhook receiver
+    trust_zone: edge
+    code_paths: ["packages/cli/src/webhooks/**"]
+    handles_assets: [asset.workflow_data]
+    entry_points: [http_webhook]
+  - id: comp.api
+    name: REST API / controllers
+    trust_zone: edge
+    code_paths: ["packages/cli/src/controllers/**"]
+    handles_assets: [asset.user_session]
+    entry_points: [http_api]
+  - id: comp.execution
+    name: Workflow execution engine
+    trust_zone: internal
+    code_paths: ["packages/core/src/**"]
+    handles_assets: [asset.workflow_data]
+    entry_points: []
+  - id: comp.nodes
+    name: Nodes (integrations)
+    trust_zone: internal
+    code_paths: ["packages/nodes-base/**"]
+    handles_assets: [asset.credentials]
+    entry_points: []
+  - id: comp.credentials
+    name: Credentials store
+    trust_zone: internal
+    code_paths: ["packages/cli/src/credentials/**"]
+    handles_assets: [asset.credentials]
+    entry_points: []
+
+data_flows:
+  - id: flow.webhook_trigger
+    from: comp.webhooks
+    to: comp.execution
+    crosses: [tb.webhook_ingress]
+    assets: [asset.workflow_data]
+  - id: flow.node_credentials
+    from: comp.execution
+    to: comp.nodes
+    crosses: [tb.node_execution]
+    assets: [asset.credentials]
+
+assumptions:
+  - id: asm.webhooks_authenticated
+    statement: >-
+      Every webhook invocation is authenticated or signature-verified before it
+      triggers a workflow.
+  - id: asm.no_unauthenticated_execution
+    statement: >-
+      Workflow execution is only triggered by an authenticated user or a verified
+      trigger, never by an anonymous request.
+  - id: asm.public_endpoints_rate_limited
+    statement: Publicly reachable endpoints are rate-limited.
+
+accepted_risks:
+  - id: risk.node_outbound
+    statement: >-
+      Nodes can make outbound requests to third-party services by design;
+      mitigated by credential scoping and workflow review.

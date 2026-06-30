@@ -1,0 +1,33 @@
+diff --git a/packages/cli/src/webhooks/PublicTriggerHandler.ts b/packages/cli/src/webhooks/PublicTriggerHandler.ts
+new file mode 100644
+index 0000000..ab12cd3
+--- /dev/null
++++ b/packages/cli/src/webhooks/PublicTriggerHandler.ts
+@@ -0,0 +1,28 @@
++import type express from 'express';
++
++import { WorkflowRunner } from '@/WorkflowRunner';
++import { WorkflowRepository } from '@/databases/repositories/workflow.repository';
++
++// POST /webhook-public/:workflowId
++// Triggers a workflow run from an unauthenticated public request.
++export function registerPublicTrigger(app: express.Application) {
++	app.post('/webhook-public/:workflowId', async (req, res) => {
++		const { workflowId } = req.params;
++
++		// NOTE: no auth, no signature check, no rate limit. The request body is
++		// passed straight in as the workflow's trigger data and run synchronously.
++		const workflow = await WorkflowRepository.findOneBy({ id: workflowId });
++		if (!workflow) {
++			return res.status(404).send();
++		}
++
++		const runner = new WorkflowRunner();
++		const result = await runner.run({
++			workflowData: workflow,
++			triggerData: req.body,
++		});
++
++		res.json(result.data);
++	});
++}
