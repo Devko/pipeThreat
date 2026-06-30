@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import re
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 # Shared system preamble for all LLM calls (spec §6).
@@ -37,14 +37,39 @@ class LLMError(RuntimeError):
     """Raised when the model call fails or returns unusable output."""
 
 
+# Default per-stage reasoning budgets (spec §2: reasoning ON but *bounded* for
+# each narrow analysis call). Classification is a cheap gate so it gets the least;
+# the assumption check is the highest-signal, most bounded judgment so it gets a
+# little more. An uncapped 4B rambles and burns CPU wall-clock.
+DEFAULT_STAGE_BUDGETS = {
+    "classify": 128,     # 6b — coarse yes/no flags
+    "stride": 256,       # 6c — STRIDE deltas over one hunk
+    "assumptions": 384,  # 6d — exhaustive assumption contradiction check
+}
+
+
 @dataclass
 class LLMConfig:
     model: str = "gemma-4-e4b"
     temperature: float = 0.0
     max_tokens: int = 512
-    # Capped thinking budget — an uncapped 4B rambles and burns wall-clock.
+    # Reasoning/thinking ON for the analysis calls, but capped (spec §2/§11).
+    reasoning: bool = True
+    # Fallback cap used when a stage has no explicit per-stage budget.
     reasoning_budget_tokens: int = 256
+    # Per-stage overrides (see DEFAULT_STAGE_BUDGETS).
+    stage_reasoning_budgets: dict = field(
+        default_factory=lambda: dict(DEFAULT_STAGE_BUDGETS)
+    )
     timeout_s: float = 120.0
+
+    def budget_for(self, stage: str | None) -> int:
+        """Reasoning-token budget for ``stage`` (0 when reasoning is disabled)."""
+        if not self.reasoning:
+            return 0
+        if stage and stage in self.stage_reasoning_budgets:
+            return self.stage_reasoning_budgets[stage]
+        return self.reasoning_budget_tokens
 
 
 class LLMClient(ABC):
@@ -54,15 +79,23 @@ class LLMClient(ABC):
         self.config = config or LLMConfig()
 
     @abstractmethod
-    def _raw_complete(self, system: str, prompt: str) -> str:
-        """Return the model's raw text for ``system`` + ``prompt``."""
+    def _raw_complete(self, system: str, prompt: str, *, stage: str | None = None) -> str:
+        """Return the model's raw text for ``system`` + ``prompt``.
 
-    def complete_json(self, prompt: str, *, system: str = SYSTEM_PREAMBLE) -> dict:
+        ``stage`` (one of ``"classify"``/``"stride"``/``"assumptions"``) lets a
+        transport pick the per-stage reasoning budget via
+        :meth:`LLMConfig.budget_for`.
+        """
+
+    def complete_json(
+        self, prompt: str, *, system: str = SYSTEM_PREAMBLE, stage: str | None = None
+    ) -> dict:
         """Run one call and return the parsed JSON object.
 
-        Raises :class:`LLMError` if no JSON object can be recovered.
+        ``stage`` selects the per-stage reasoning budget. Raises
+        :class:`LLMError` if no JSON object can be recovered.
         """
-        raw = self._raw_complete(system, prompt)
+        raw = self._raw_complete(system, prompt, stage=stage)
         return parse_json_object(raw)
 
 
@@ -153,9 +186,11 @@ class ScriptedLLMClient(LLMClient):
         self.responses = responses or {}
         self.default = default if default is not None else {}
         self.calls: list[str] = []
+        self.stages: list[str | None] = []
 
-    def _raw_complete(self, system: str, prompt: str) -> str:
+    def _raw_complete(self, system: str, prompt: str, *, stage: str | None = None) -> str:
         self.calls.append(prompt)
+        self.stages.append(stage)
         for tag, payload in self.responses.items():
             if tag in prompt:
                 return json.dumps(payload)

@@ -60,7 +60,7 @@ def stride_deltas(
 
     hunk_text = _concat_hunks(hunks, max_hunk_chars)
     prompt = prompts.stride_prompt(component, hunk_text, flags)
-    result = llm.complete_json(prompt)
+    result = llm.complete_json(prompt, stage="stride")
 
     low_confidence = bool(result.get("low_confidence", False))
     raw_deltas = result.get("deltas", [])
