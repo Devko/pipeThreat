@@ -1,0 +1,8 @@
+[
+  {
+    "path": "src/users/admin_handler.py",
+    "entry_points": ["http_public"],
+    "untrusted_inputs": ["self.path"],
+    "sinks": ["self.wfile.write", "get_user_profile"]
+  }
+]

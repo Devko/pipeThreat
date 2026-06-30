@@ -1,0 +1,68 @@
+# Example threat-model baseline (spec §3).
+# Human-authored, human-approved, version-controlled alongside the code.
+# `code_paths` is the linking mechanism: it maps threat-model elements to source
+# paths so a diff can resolve to the elements it affects.
+system:
+  name: payments-api
+  version: 2025.11
+  description: Cardholder data intake and tokenization service.
+
+assets:
+  - id: asset.cardholder_pan
+    name: Cardholder PAN
+    sensitivity: critical
+  - id: asset.user_pii
+    name: User PII
+    sensitivity: high
+  - id: asset.session_token
+    name: Session token
+    sensitivity: high
+
+trust_boundaries:
+  - id: tb.internet_edge
+    name: Internet to Edge
+    description: External clients reaching the API gateway.
+    controls: [waf, tls_termination, edge_input_validation]
+  - id: tb.dmz_internal
+    name: DMZ to Internal
+    description: Gateway/DMZ services reaching internal services.
+    controls: [mtls, service_authz]
+
+components:
+  - id: comp.api_gateway
+    name: API Gateway
+    trust_zone: dmz
+    code_paths: ["src/gateway/**"]
+    handles_assets: [asset.session_token]
+    entry_points: [http_public]
+  - id: comp.tokenizer
+    name: Tokenizer Service
+    trust_zone: internal
+    code_paths: ["src/tokenizer/**"]
+    handles_assets: [asset.cardholder_pan]
+    entry_points: [grpc_internal]
+  - id: comp.user_service
+    name: User Service
+    trust_zone: internal
+    code_paths: ["src/users/**"]
+    handles_assets: [asset.user_pii]
+    entry_points: [grpc_internal]
+
+data_flows:
+  - id: flow.tokenize
+    from: comp.api_gateway
+    to: comp.tokenizer
+    crosses: [tb.dmz_internal]
+    assets: [asset.cardholder_pan]
+
+assumptions:
+  - id: asm.edge_validation
+    statement: All externally originated input is validated at the API gateway before reaching any internal service.
+  - id: asm.no_direct_internal_ingress
+    statement: Internal services are not reachable directly from the internet; all external traffic transits the gateway.
+  - id: asm.pan_never_logged
+    statement: Cardholder PAN is never written to logs or persisted in plaintext.
+
+accepted_risks:
+  - id: risk.grpc_no_rate_limit
+    statement: Internal gRPC endpoints are not rate-limited; mitigated by network isolation.

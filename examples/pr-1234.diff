@@ -1,0 +1,20 @@
+diff --git a/src/users/admin_handler.py b/src/users/admin_handler.py
+new file mode 100644
+index 0000000..a1b2c3d
+--- /dev/null
++++ b/src/users/admin_handler.py
+@@ -0,0 +1,14 @@
++from http.server import BaseHTTPRequestHandler
++
++from users.store import get_user_profile
++
++
++class AdminHandler(BaseHTTPRequestHandler):
++    """Public HTTP route returning a user's full profile by id. No auth."""
++
++    def do_GET(self):
++        user_id = self.path.rsplit("/", 1)[-1]
++        profile = get_user_profile(user_id)  # full PII: name, email, address
++        self.send_response(200)
++        self.end_headers()
++        self.wfile.write(profile.to_json().encode())
