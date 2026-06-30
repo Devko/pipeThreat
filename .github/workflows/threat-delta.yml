@@ -1,0 +1,66 @@
+# Pipeline step 6 — Threat-Model Delta (advisory / non-blocking).
+# Runs async to the deterministic gate; uploads SARIF and posts the PR comment.
+# It never fails the build on its own (see spec §9); the optional required-review
+# hook is a human gate via the `security/needs-review` label + branch protection.
+name: threat-model-delta
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  threat-delta:
+    runs-on: ubuntu-latest
+    # Advisory: a failure here must not block the merge.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: pip install -e .
+
+      - name: Produce the PR diff
+        run: |
+          git diff "origin/${{ github.base_ref }}...HEAD" > pr.diff
+
+      - name: Run threat-model delta
+        run: |
+          threat-delta \
+            --baseline threat-model.yaml \
+            --diff pr.diff \
+            --pr "${{ github.event.pull_request.number }}" \
+            --sarif threat-delta.sarif \
+            --comment threat-delta.md
+        # Annotations (step 5) and findings (steps 2-4) are wired in via
+        # --annotations / --findings when those upstream steps publish them.
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: threat-delta.sarif
+          category: threat-model-delta
+
+      - name: Post PR comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('threat-delta.md', 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });

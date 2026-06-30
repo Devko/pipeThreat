@@ -31,6 +31,7 @@ from .models import (
 )
 from .baseline import Baseline, BaselineError, load_baseline, parse_baseline
 from .llm import LLMClient, LLMConfig, LLMError, ScriptedLLMClient, SYSTEM_PREAMBLE
+from .pipeline import AnalysisResult, analyze
 
 __version__ = "0.1.0"
 
@@ -44,5 +45,7 @@ __all__ = [
     "Baseline", "BaselineError", "load_baseline", "parse_baseline",
     # llm
     "LLMClient", "LLMConfig", "LLMError", "ScriptedLLMClient", "SYSTEM_PREAMBLE",
+    # pipeline
+    "AnalysisResult", "analyze",
     "__version__",
 ]
