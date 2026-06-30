@@ -248,3 +248,36 @@ def test_truly_empty_message_errors():
     client = OpenAICompatibleClient(http_post=fake_post)
     with pytest.raises(LLMError, match="empty message content"):
         client.complete_json("hi", stage="classify")
+
+
+def test_ollama_disables_thinking_when_reasoning_off():
+    """OllamaClient with reasoning off sends think:false (fast, direct answer);
+    with reasoning on it sends reasoning_effort and no think field."""
+    from threat_delta.llm import LLMConfig
+    from threat_delta.transports import OllamaClient
+
+    off = RecordingPost()
+    c_off = OllamaClient(http_post=off, config=LLMConfig(reasoning=False))
+    c_off._raw_complete("s", "p", stage="classify")
+    body_off = off.sent_json()
+    assert body_off["think"] is False
+    assert "reasoning_effort" not in body_off
+
+    on = RecordingPost()
+    c_on = OllamaClient(http_post=on, config=LLMConfig(reasoning=True))
+    c_on._raw_complete("s", "p", stage="classify")
+    body_on = on.sent_json()
+    assert "think" not in body_on
+    assert body_on["reasoning_effort"] == "low"
+
+
+def test_parser_recovers_answer_from_chain_of_thought():
+    """parse_json_object picks the keyed/last object out of thinking prose."""
+    from threat_delta.llm import parse_json_object
+
+    cot = (
+        'Thinking... maybe {"stride":"x"} is an example. '
+        'Final: {"deltas":[{"stride":"InformationDisclosure","reason":"leak"}]}'
+    )
+    out = parse_json_object(cot, prefer_keys=("deltas",))
+    assert out["deltas"][0]["stride"] == "InformationDisclosure"

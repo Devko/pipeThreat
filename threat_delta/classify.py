@@ -53,7 +53,9 @@ def classify_change(
     ``"low_confidence": true`` propagates to :attr:`Flags.low_confidence`.
     """
     prompt = prompts.classification_prompt(slice, diff, annotations)
-    result = llm.complete_json(prompt, stage="classify")
+    result = llm.complete_json(
+        prompt, stage="classify", prefer_keys=("new_entry_point", "trust_boundary_crossing")
+    )
 
     flags = Flags()
     for key in _FLAG_KEYS:

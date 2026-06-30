@@ -81,6 +81,11 @@ class OpenAICompatibleClient(LLMClient):
         # We send it by default but disable it for this client after the first
         # such rejection, then retry without it.
         self._reasoning_enabled = True
+        # When reasoning is OFF, actively disable the model's thinking where the
+        # server supports it (Ollama's `think` field). Subclasses for such servers
+        # set this True. Generic OpenAI servers ignore unknown fields, but we keep
+        # it off by default to avoid a 400 on stricter servers.
+        self._send_think_false = False
 
     @staticmethod
     def _reasoning_effort(budget: int) -> str:
@@ -108,7 +113,11 @@ class OpenAICompatibleClient(LLMClient):
         # the hint entirely.
         if reasoning_budget > 0:
             body["reasoning_effort"] = self._reasoning_effort(reasoning_budget)
-            body.update(self.extra_body)
+        elif self._send_think_false:
+            # Thinking off: a chain-of-thought model on a CPU runner is slow and
+            # can bury/cut off the JSON answer. Tell Ollama to answer directly.
+            body["think"] = False
+        body.update(self.extra_body)
         return body
 
     def _raw_complete(
@@ -200,6 +209,9 @@ class OllamaClient(OpenAICompatibleClient):
             extra_body=extra_body,
             http_post=http_post,
         )
+        # Ollama understands the `think` field, so we can actively disable a
+        # thinking model's chain-of-thought when reasoning is off.
+        self._send_think_false = True
 
 
 def build_client(

@@ -55,9 +55,17 @@ jobs:
       - name: Provision Ollama + model
         run: |
           set -euo pipefail
+          # Keep models under a runner-owned dir matching the cache path above
+          # (the installer's systemd service otherwise stores them under
+          # /usr/share/ollama, which the cache step can't read).
+          export OLLAMA_MODELS="$HOME/.ollama/models"
+          mkdir -p "$OLLAMA_MODELS"
           if ! command -v ollama >/dev/null 2>&1; then
             curl -fsSL https://ollama.com/install.sh | sh
           fi
+          # Stop the installer's service so our own server (with OLLAMA_MODELS)
+          # owns the port and the cacheable model directory.
+          sudo systemctl stop ollama 2>/dev/null || true
           ollama serve >"$RUNNER_TEMP/ollama.log" 2>&1 &
           for i in $(seq 1 30); do
             curl -fsS http://localhost:11434/api/tags >/dev/null 2>&1 && break

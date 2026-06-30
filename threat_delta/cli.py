@@ -23,7 +23,7 @@ import json
 import sys
 
 from .coverage import collect_source_paths, compute_coverage, format_report
-from .llm import LLMClient
+from .llm import LLMClient, LLMConfig
 from .scaffold import init_baseline
 from .step import needs_human_review, run_step
 from .transports import build_client
@@ -37,11 +37,16 @@ def _build_llm(args: argparse.Namespace) -> LLMClient:
     rather than hallucinating). ``ollama``/``openai`` target a local
     OpenAI-compatible server running a Gemma-class model.
     """
+    # Thinking is OFF by default: a chain-of-thought model on a CPU runner is
+    # slow and can bury/cut off the JSON answer. `--think` opts back into the
+    # spec's bounded reasoning mode.
+    config = LLMConfig(reasoning=getattr(args, "think", False))
     try:
         return build_client(
             getattr(args, "llm", "stub"),
             base_url=getattr(args, "llm_base_url", None),
             model=getattr(args, "llm_model", None),
+            config=config,
         )
     except ValueError as e:
         raise SystemExit(str(e))
@@ -57,6 +62,11 @@ def _add_llm_args(p: argparse.ArgumentParser) -> None:
     )
     p.add_argument("--llm-base-url", help="OpenAI-compatible server base URL")
     p.add_argument("--llm-model", help="model name (e.g. gemma4:e4b)")
+    p.add_argument(
+        "--think",
+        action="store_true",
+        help="enable bounded model reasoning (slower on CPU; off by default)",
+    )
 
 
 # --------------------------------------------------------------------------- #

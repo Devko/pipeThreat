@@ -92,22 +92,33 @@ class LLMClient(ABC):
         """
 
     def complete_json(
-        self, prompt: str, *, system: str = SYSTEM_PREAMBLE, stage: str | None = None
+        self,
+        prompt: str,
+        *,
+        system: str = SYSTEM_PREAMBLE,
+        stage: str | None = None,
+        prefer_keys: tuple[str, ...] = (),
     ) -> dict:
         """Run one call and return the parsed JSON object.
 
-        ``stage`` selects the per-stage reasoning budget. Raises
+        ``stage`` selects the per-stage reasoning budget. ``prefer_keys`` helps
+        recover the right object from a thinking model's chain-of-thought (the
+        answer object usually contains one of these keys and comes last). Raises
         :class:`LLMError` if no JSON object can be recovered.
         """
         raw = self._raw_complete(system, prompt, stage=stage)
-        return parse_json_object(raw)
+        return parse_json_object(raw, prefer_keys=prefer_keys)
 
 
-def parse_json_object(text: str) -> dict:
+def parse_json_object(text: str, *, prefer_keys: tuple[str, ...] = ()) -> dict:
     """Best-effort recovery of a single JSON object from model output.
 
     Tolerates surrounding prose and ```json fences even though the preamble
-    forbids them — a small local model will not always comply.
+    forbids them — a small local model will not always comply. For *thinking*
+    models the answer is buried in chain-of-thought, so when the whole string
+    isn't clean JSON we scan every balanced ``{...}`` span and prefer the LAST
+    one (the conclusion comes last); ``prefer_keys`` further biases toward the
+    object that actually carries the expected answer key.
     """
     if text is None:
         raise LLMError("model returned no text")
@@ -131,45 +142,61 @@ def parse_json_object(text: str) -> dict:
         except json.JSONDecodeError:
             pass
 
-    # Last resort: the first balanced {...} span.
-    span = _first_balanced_object(stripped)
-    if span is not None:
+    # Scan every balanced {...} span; collect the ones that parse to a dict.
+    candidates: list[dict] = []
+    for span in _balanced_objects(stripped):
         try:
             obj = json.loads(span)
-            if isinstance(obj, dict):
-                return obj
         except json.JSONDecodeError:
-            pass
+            continue
+        if isinstance(obj, dict):
+            candidates.append(obj)
+
+    if candidates:
+        if prefer_keys:
+            for obj in reversed(candidates):
+                if any(k in obj for k in prefer_keys):
+                    return obj
+        # No keyed match (or none requested): the final object wins.
+        return candidates[-1]
 
     raise LLMError(f"could not parse JSON object from model output: {text!r:.200}")
 
 
-def _first_balanced_object(text: str) -> str | None:
-    start = text.find("{")
-    if start == -1:
-        return None
-    depth = 0
-    in_str = False
-    escape = False
-    for i in range(start, len(text)):
-        ch = text[i]
-        if in_str:
-            if escape:
-                escape = False
-            elif ch == "\\":
-                escape = True
-            elif ch == '"':
-                in_str = False
+def _balanced_objects(text: str):
+    """Yield each top-level balanced ``{...}`` span in ``text``, in order."""
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i] != "{":
+            i += 1
             continue
-        if ch == '"':
-            in_str = True
-        elif ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return text[start : i + 1]
-    return None
+        depth = 0
+        in_str = False
+        escape = False
+        j = i
+        while j < n:
+            ch = text[j]
+            if in_str:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == '"':
+                    in_str = False
+                j += 1
+                continue
+            if ch == '"':
+                in_str = True
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    yield text[i : j + 1]
+                    break
+            j += 1
+        i = j + 1
 
 
 class ScriptedLLMClient(LLMClient):

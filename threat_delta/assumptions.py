@@ -46,7 +46,7 @@ def assumption_check(
 
     known_ids = {a.id for a in assumptions}
     prompt = prompts.assumption_prompt(assumptions, diff, annotations)
-    result = llm.complete_json(prompt, stage="assumptions")
+    result = llm.complete_json(prompt, stage="assumptions", prefer_keys=("violations",))
 
     low_confidence = _coerce_bool(result.get("low_confidence", False))
     raw_violations = result.get("violations", [])
