@@ -153,3 +153,57 @@ def test_build_client_openai_custom():
 def test_build_client_bogus():
     with pytest.raises(ValueError):
         build_client("bogus")
+
+
+def test_reasoning_400_degrades_and_retries():
+    """A 400 while sending reasoning_effort disables it and retries without it
+    (mirrors gemma3:4b on Ollama rejecting the hint)."""
+    import io
+    import json as _json
+    import urllib.error
+
+    from threat_delta.transports import OpenAICompatibleClient
+
+    bodies = []
+
+    def fake_post(url, headers, body, timeout):
+        payload = _json.loads(body)
+        bodies.append(payload)
+        if "reasoning_effort" in payload:
+            raise urllib.error.HTTPError(
+                url, 400, "Bad Request", {}, io.BytesIO(b'{"error":"model does not support reasoning"}')
+            )
+        return _json.dumps({"choices": [{"message": {"content": '{"ok": true}'}}]}).encode()
+
+    client = OpenAICompatibleClient(http_post=fake_post)
+    out = client.complete_json("hello", stage="assumptions")
+    assert out == {"ok": True}
+    # First attempt carried the hint (rejected); retry dropped it.
+    assert "reasoning_effort" in bodies[0]
+    assert "reasoning_effort" not in bodies[1]
+    # The client stays degraded, so the next call skips reasoning entirely.
+    client.complete_json("again", stage="assumptions")
+    assert "reasoning_effort" not in bodies[2]
+
+
+def test_non_reasoning_400_surfaces_body():
+    """A 400 that is not about reasoning surfaces the server's error body."""
+    import io
+    import urllib.error
+
+    import pytest
+
+    from threat_delta.llm import LLMError
+    from threat_delta.transports import OpenAICompatibleClient
+
+    def fake_post(url, headers, body, timeout):
+        raise urllib.error.HTTPError(
+            url, 400, "Bad Request", {}, io.BytesIO(b'{"error":"bad model name"}')
+        )
+
+    # reasoning disabled so the 400 is not retried — the body must be surfaced.
+    from threat_delta.llm import LLMConfig
+
+    client = OpenAICompatibleClient(http_post=fake_post, config=LLMConfig(reasoning=False))
+    with pytest.raises(LLMError, match="bad model name"):
+        client.complete_json("hi", stage="classify")

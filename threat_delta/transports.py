@@ -43,6 +43,14 @@ def _urllib_post(url: str, headers: dict, body: bytes, timeout: float) -> bytes:
         return response.read()
 
 
+def _read_http_error(exc: urllib.error.HTTPError) -> str:
+    """Best-effort read of an HTTPError's response body for diagnostics."""
+    try:
+        return exc.read().decode("utf-8", "replace").strip()
+    except Exception:  # pragma: no cover - body already consumed / unreadable
+        return ""
+
+
 class OpenAICompatibleClient(LLMClient):
     """LLM transport for any OpenAI-compatible ``/chat/completions`` server.
 
@@ -68,6 +76,11 @@ class OpenAICompatibleClient(LLMClient):
         self.api_key = api_key
         self.extra_body = dict(extra_body) if extra_body else {}
         self.http_post: HttpPost = http_post or _urllib_post
+        # Reasoning hints are best-effort: some servers/models (e.g. a
+        # non-thinking gemma3:4b on Ollama) reject `reasoning_effort` with a 400.
+        # We send it by default but disable it for this client after the first
+        # such rejection, then retry without it.
+        self._reasoning_enabled = True
 
     @staticmethod
     def _reasoning_effort(budget: int) -> str:
@@ -78,9 +91,7 @@ class OpenAICompatibleClient(LLMClient):
             return "medium"
         return "high"
 
-    def _raw_complete(
-        self, system: str, prompt: str, *, stage: str | None = None
-    ) -> str:
+    def _build_body(self, system: str, prompt: str, *, reasoning_budget: int) -> dict:
         body: dict = {
             "model": self.model,
             "messages": [
@@ -91,28 +102,56 @@ class OpenAICompatibleClient(LLMClient):
             "max_tokens": self.config.max_tokens,
             "stream": False,
         }
-
         # Bounded reasoning (spec §2/§11). The temperature and max_tokens caps
-        # above always apply; the reasoning hint below is best-effort and exact
-        # support depends on the server/model. When the budget is 0 (reasoning
-        # disabled) we omit the hint entirely.
-        budget = self.config.budget_for(stage)
-        if budget > 0:
-            body["reasoning_effort"] = self._reasoning_effort(budget)
+        # always apply; the reasoning hint is best-effort and its exact support
+        # depends on the server/model. A budget of 0 (or a degraded client) omits
+        # the hint entirely.
+        if reasoning_budget > 0:
+            body["reasoning_effort"] = self._reasoning_effort(reasoning_budget)
             body.update(self.extra_body)
+        return body
 
+    def _raw_complete(
+        self, system: str, prompt: str, *, stage: str | None = None
+    ) -> str:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key or 'sk-no-key'}",
         }
         url = f"{self.base_url}/chat/completions"
-        payload = json.dumps(body).encode("utf-8")
+
+        budget = self.config.budget_for(stage) if self._reasoning_enabled else 0
+        sent_reasoning = budget > 0
+        payload = json.dumps(self._build_body(system, prompt, reasoning_budget=budget))
 
         try:
-            raw = self.http_post(url, headers, payload, self.config.timeout_s)
-            data = json.loads(raw)
-        except (urllib.error.HTTPError, urllib.error.URLError) as exc:
+            raw = self.http_post(url, headers, payload.encode("utf-8"), self.config.timeout_s)
+        except urllib.error.HTTPError as exc:
+            detail = _read_http_error(exc)
+            # Graceful degrade: a 400 while sending a reasoning hint usually means
+            # the model doesn't support it. Disable it for this client and retry.
+            if exc.code == 400 and sent_reasoning:
+                self._reasoning_enabled = False
+                retry = json.dumps(self._build_body(system, prompt, reasoning_budget=0))
+                try:
+                    raw = self.http_post(
+                        url, headers, retry.encode("utf-8"), self.config.timeout_s
+                    )
+                except (urllib.error.HTTPError, urllib.error.URLError) as exc2:
+                    extra = _read_http_error(exc2) if isinstance(exc2, urllib.error.HTTPError) else ""
+                    raise LLMError(
+                        f"LLM HTTP request to {url} failed after dropping reasoning: "
+                        f"{exc2} {extra}".strip()
+                    ) from exc2
+            else:
+                raise LLMError(
+                    f"LLM HTTP request to {url} failed: HTTP {exc.code} {detail}".strip()
+                ) from exc
+        except urllib.error.URLError as exc:
             raise LLMError(f"LLM HTTP request to {url} failed: {exc}") from exc
+
+        try:
+            data = json.loads(raw)
         except (json.JSONDecodeError, ValueError) as exc:
             raise LLMError(f"LLM returned non-JSON HTTP response: {exc}") from exc
 
