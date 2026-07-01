@@ -201,6 +201,49 @@ def test_comment_needs_review_label_hook():
     assert "security/needs-review" in text
 
 
+def test_comment_consolidates_parallel_assumption_violations():
+    # Several assumption violations on one component collapse into a single
+    # root-caused block instead of N near-identical bullets.
+    comp = _delta(
+        delta_id="c",
+        type=DeltaType.NEW_ENTRY_POINT,
+        affected_elements=["comp.api"],
+    )
+    comp.change_signals = ["new entry point", "control change"]
+    av = [
+        _delta(
+            delta_id=f"a{i}",
+            type=DeltaType.ASSUMPTION_VIOLATION,
+            affected_elements=["comp.api"],
+            contradicts_assumption=aid,
+            requires_human_review=True,
+            description=f"Change weakens or violates assumption '{aid}': reason {i}",
+        )
+        for i, aid in enumerate(["asm.one", "asm.two", "asm.three"])
+    ]
+    text = build_comment([comp, *av])
+    # One consolidated block, not three separate assumption bullets.
+    assert "contradicted assumptions (3)" in text
+    assert text.count("**contradicted assumptions") == 1
+    assert "Root cause: new entry point on `comp.api`" in text
+    # All three assumptions are still listed as consequences.
+    for aid in ("asm.one", "asm.two", "asm.three"):
+        assert aid in text
+
+
+def test_comment_single_assumption_not_consolidated():
+    # A lone assumption violation renders as a normal bullet (no block overhead).
+    av = _delta(
+        type=DeltaType.ASSUMPTION_VIOLATION,
+        affected_elements=["comp.api"],
+        contradicts_assumption="asm.solo",
+        description="Change weakens or violates assumption 'asm.solo': lonely",
+    )
+    text = build_comment([av])
+    assert "contradicted assumptions (" not in text
+    assert "asm.solo" in text
+
+
 def test_comment_footer_counts():
     deltas = [
         _delta(delta_id="h", severity=Severity.HIGH),

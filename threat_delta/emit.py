@@ -14,7 +14,22 @@ from __future__ import annotations
 
 import json
 
-from .models import Delta, Severity
+from .models import Confidence, Delta, DeltaType, Severity
+
+
+# Delta types that describe a component change (the "root cause" of the
+# assumption violations that ride along with it).
+_COMPONENT_TYPES = frozenset(
+    {
+        DeltaType.NEW_ENTRY_POINT,
+        DeltaType.TRUST_BOUNDARY_CROSSING,
+        DeltaType.CONTROL_CHANGE,
+        DeltaType.ASSET_EXPOSURE,
+        DeltaType.NEW_DATA_FLOW,
+    }
+)
+
+_CONFIDENCE_RANK = {Confidence.LOW: 0, Confidence.MEDIUM: 1, Confidence.HIGH: 2}
 
 
 SARIF_SCHEMA = (
@@ -207,19 +222,100 @@ def _format_delta(delta: Delta) -> str:
     return "\n".join(lines)
 
 
+def _component_delta_index(deltas: list[Delta]) -> dict[str, Delta]:
+    """Map component id -> its change delta (the root-cause anchor)."""
+    index: dict[str, Delta] = {}
+    for d in deltas:
+        if d.type in _COMPONENT_TYPES and d.affected_elements:
+            index.setdefault(d.affected_elements[0], d)
+    return index
+
+
+def _assumption_reason(delta: Delta) -> str:
+    """The bare reason from an assumption-violation description.
+
+    Descriptions read ``Change weakens or violates assumption 'X': <reason>``;
+    strip the boilerplate prefix so the consolidated list stays scannable.
+    """
+    marker = "': "
+    i = delta.description.find(marker)
+    return delta.description[i + len(marker):] if i != -1 else delta.description
+
+
+def _format_assumption_group(members: list[Delta], comp_index: dict[str, Delta]) -> str:
+    """Render several assumption violations on one component as a single block.
+
+    Turns N parallel ``assumption_violation`` deltas (which all stem from one
+    change) into a single finding that names the root cause once and lists the
+    contradicted assumptions as consequences — so a reviewer reads one issue, not
+    five look-alikes.
+    """
+    affected_ids = sorted({e for d in members for e in d.affected_elements})
+    elements = ", ".join(f"`{e}`" for e in affected_ids) or "_(none)_"
+    title = f"- **contradicted assumptions ({len(members)})** — affected: {elements}"
+    if any(d.requires_human_review for d in members):
+        title += "  :warning: **needs human review**"
+    lines = [title]
+
+    # Root cause: the co-located component change, named once.
+    comp = next((comp_index[e] for e in affected_ids if e in comp_index), None)
+    if comp is not None:
+        signal = comp.change_signals[0] if comp.change_signals else comp.type.value.replace("_", " ")
+        lines.append(f"  - Root cause: {signal} on `{comp.affected_elements[0]}`")
+
+    conf = min(members, key=lambda d: _CONFIDENCE_RANK[d.confidence]).confidence
+    conf_text = conf.value + (" (low confidence)" if any(d.low_confidence for d in members) else "")
+    lines.append(f"  - Confidence: {conf_text}")
+
+    for d in members:
+        lines.append(f"  - `{d.contradicts_assumption}` — {_assumption_reason(d)}")
+    lines.append(f"  - Recommended action: {members[0].recommended_action}")
+    return "\n".join(lines)
+
+
+def _format_section(group: list[Delta], comp_index: dict[str, Delta]) -> str:
+    """Render one severity section, consolidating parallel assumption violations.
+
+    Component/untracked deltas render individually first (the change that was
+    made); assumption violations that share a component collapse into one
+    ``contradicted assumptions`` block (the consequences of that change).
+    """
+    others = [d for d in group if d.type != DeltaType.ASSUMPTION_VIOLATION]
+    assumptions = [d for d in group if d.type == DeltaType.ASSUMPTION_VIOLATION]
+
+    blocks = [_format_delta(d) for d in others]
+
+    by_component: dict[tuple, list[Delta]] = {}
+    for d in assumptions:
+        by_component.setdefault(tuple(sorted(d.affected_elements)), []).append(d)
+    for members in by_component.values():
+        if len(members) >= 2:
+            blocks.append(_format_assumption_group(members, comp_index))
+        else:
+            blocks.append(_format_delta(members[0]))
+    return "\n".join(blocks)
+
+
 def build_comment(deltas: list[Delta]) -> str:
-    """Render the PR comment grouping deltas by severity (spec §9)."""
+    """Render the PR comment grouping deltas by severity (spec §9).
+
+    Within each severity band, several assumption violations that stem from one
+    component change are consolidated into a single root-caused block, so a
+    reviewer sees one issue with its consequences instead of a wall of
+    near-identical findings.
+    """
     if not deltas:
         return f"{_ADVISORY_HEADER}\n\n{_NO_DELTAS}"
 
     parts: list[str] = [_ADVISORY_HEADER]
+    comp_index = _component_delta_index(deltas)
 
     for severity, label in _SEVERITY_SECTIONS:
         group = [d for d in deltas if d.severity == severity]
         if not group:
             continue
         parts.append(f"### {label} ({len(group)})")
-        parts.append("\n".join(_format_delta(d) for d in group))
+        parts.append(_format_section(group, comp_index))
 
     # Footer: counts + the security/needs-review label hook (spec §9).
     counts = {

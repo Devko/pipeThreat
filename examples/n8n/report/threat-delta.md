@@ -4,27 +4,13 @@ _This check is advisory and **non-blocking** — it never fails the build._
 
 ### High (3)
 
-- **assumption_violation** — affected: `comp.webhooks`  :warning: **needs human review**
-  - Contradicts assumption: `asm.no_unauthenticated_execution`
+- **contradicted assumptions (3)** — affected: `comp.webhooks`  :warning: **needs human review**
+  - Root cause: new entry point on `comp.webhooks`
   - Confidence: high
-  - Why high: assumption guards `asset.workflow_data` (high-sensitivity) → High
-  - Change weakens or violates assumption 'asm.no_unauthenticated_execution': an anonymous request triggers workflow execution
+  - `asm.no_unauthenticated_execution` — an anonymous request triggers workflow execution
+  - `asm.public_endpoints_rate_limited` — the public endpoint applies no rate limit
+  - `asm.webhooks_authenticated` — endpoint verifies no token or signature
   - Recommended action: Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.
-  - Proposed baseline update: assumption_revisited `asm.no_unauthenticated_execution` — confirm intended; update or reaffirm the assumption
-- **assumption_violation** — affected: `comp.webhooks`  :warning: **needs human review**
-  - Contradicts assumption: `asm.public_endpoints_rate_limited`
-  - Confidence: high
-  - Why high: assumption guards `asset.workflow_data` (high-sensitivity) → High
-  - Change weakens or violates assumption 'asm.public_endpoints_rate_limited': the public endpoint applies no rate limit
-  - Recommended action: Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.
-  - Proposed baseline update: assumption_revisited `asm.public_endpoints_rate_limited` — confirm intended; update or reaffirm the assumption
-- **assumption_violation** — affected: `comp.webhooks`  :warning: **needs human review**
-  - Contradicts assumption: `asm.webhooks_authenticated`
-  - Confidence: high
-  - Why high: assumption guards `asset.workflow_data` (high-sensitivity) → High
-  - Change weakens or violates assumption 'asm.webhooks_authenticated': endpoint verifies no token or signature
-  - Recommended action: Restore the assumption or, if the change is a legitimate evolution, update the baseline assumption and obtain security review.
-  - Proposed baseline update: assumption_revisited `asm.webhooks_authenticated` — confirm intended; update or reaffirm the assumption
 
 ### Medium (1)
 

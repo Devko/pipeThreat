@@ -34,7 +34,10 @@ build. Severity is computed from facts, so it is stable across runs.
 Each finding folds a component's change-signals into one line (not one near-
 duplicate per signal), states *why* the severity is what it is, and reports a
 confidence that means something — `high` only when an independent static-analysis
-signal corroborates the model.
+signal corroborates the model. Multiple assumptions broken by the *same* change
+are grouped under one root cause, so a reviewer reads one issue with its
+consequences instead of a wall of look-alikes (the deltas stay separate in SARIF
+for tracking).
 
 ---
 
@@ -46,7 +49,7 @@ signal corroborates the model.
 | **6b** `classify_change` | Coarse flags — is a new entry point / data flow / boundary crossing / asset change / control change plausibly in play? | 1 LLM call |
 | **6c** `stride_deltas` | Per affected component: which STRIDE categories does *this* change introduce or worsen? Grounded with deterministic signals | N LLM calls |
 | **6d** `assumption_check` | Which stated assumptions does the diff violate or weaken? **One bounded call per assumption** (small models drop items when batched) | M LLM calls |
-| **6e** assemble + score + emit | Collapse each component's signals into one scored delta, dedupe, render SARIF + PR comment | deterministic |
+| **6e** assemble + score + emit | Collapse each component's signals into one scored delta; group its assumption violations under one root cause; dedupe; render SARIF + PR comment | deterministic |
 
 6b **gates** 6c and 6d: if every flag is false, the expensive calls are skipped and
 only deterministic `untracked_path` deltas remain. A typical PR is a handful of
