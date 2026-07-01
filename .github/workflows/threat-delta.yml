@@ -1,8 +1,8 @@
-# Example consumer workflow for the Threat-Model Delta step, driven by the
+# Example consumer workflow for the Threat-Model Delta analysis, driven by the
 # composite action in this repo (uses: ./). In another repository, replace
 # `uses: ./` with `uses: Devko/pipeThreat@main` (or a pinned tag).
 #
-# The step is advisory (spec §9): it never fails the build on its own. The job
+# The analysis is advisory: it never fails the build on its own. The job
 # uploads SARIF and posts the PR comment.
 name: threat-model-delta
 
@@ -13,6 +13,11 @@ permissions:
   contents: read
   pull-requests: write
   security-events: write
+
+# One run per PR; a new push cancels the in-flight (model-provisioning) run.
+concurrency:
+  group: threat-model-delta-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   threat-delta:

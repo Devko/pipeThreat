@@ -1,14 +1,14 @@
-"""Stage 6b — delta-type classification (pipeline step 6).
+"""Stage 2 — delta-type classification.
 
 Asks the model a single, narrow question: of the five coarse delta categories
 (new entry point, new data flow, trust-boundary crossing, asset-handling change,
 control change), which are *plausibly* introduced or changed by this diff? The
-boolean answers gate the more expensive per-component STRIDE stage (6c): if no
-flag is positive there is nothing for 6c to reason about.
+boolean answers gate the more expensive per-component STRIDE stage (Stage 3): if no
+flag is positive there is nothing for Stage 3 to reason about.
 
 This module only maps the model's JSON into a :class:`Flags` value object; it is
 defensive about missing keys and non-boolean truthy/falsey values because a small
-local model will not always emit a clean schema (spec §11).
+local model will not always emit a clean schema.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ def _coerce_bool(value) -> bool:
     """Coerce a model-returned value to bool.
 
     Accepts JSON booleans, but also tolerates the strings ``"true"``/``"false"``
-    (and ``"yes"``/``"no"``/``"1"``/``"0"``) a 4B sometimes emits instead.
+    (and ``"yes"``/``"no"``/``"1"``/``"0"``) a small model sometimes emits instead.
     """
     if isinstance(value, bool):
         return value
@@ -46,7 +46,7 @@ def classify_change(
     annotations: list[FileAnnotation],
     llm: LLMClient,
 ) -> Flags:
-    """6b — classify which coarse delta-types are plausibly in play.
+    """Stage 2 — classify which coarse delta-types are plausibly in play.
 
     Builds the classification prompt and runs ``config.votes`` samples (one by
     default). Each flag is set when a **majority** of samples set it; a split

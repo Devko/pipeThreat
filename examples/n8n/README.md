@@ -1,6 +1,6 @@
 # Worked example — n8n (TypeScript / Node)
 
-An end-to-end run of the Threat-Model Delta step against a real TypeScript project,
+An end-to-end run of the Threat-Model Delta analysis against a real TypeScript project,
 [n8n](https://github.com/n8n-io/n8n). The third worked example (with the Python
 [Synapse](../synapse/) and Go [Vault](../vault/) ones) — a different language again,
 and the one that exercises **Tampering** and **DenialOfService** STRIDE categories
@@ -11,7 +11,7 @@ and **tiered severity** (High + Medium in one report).
 > model for the project. The committed report is generated with a **scripted model**
 > (deterministic and reproducible without a model server), representing what a small
 > local model returns for this diff. Everything else — relevance, the deterministic
-> §7 severity, dedup, and SARIF/comment rendering — is the real pipeline. Run it
+> severity, dedup, and SARIF/comment rendering — is the real pipeline. Run it
 > live with `--llm ollama` (see below).
 
 ## The PR
@@ -21,25 +21,25 @@ and **tiered severity** (High + Medium in one report).
 and **executes it synchronously with the request body as trigger data** — with
 **no authentication, no signature check, and no rate limit**.
 
-## How the step reasons about it
+## How the analysis reasons about it
 
-- **6a (relevance):** `packages/cli/src/webhooks/**` → `comp.webhooks` (zone `edge`,
+- **Stage 1 (relevance):** `packages/cli/src/webhooks/**` → `comp.webhooks` (zone `edge`,
   handles `asset.workflow_data` — high). Pulls in all assumptions.
-- **6b (classify):** `new_entry_point`, `trust_boundary_crossing`, `control_change`.
-- **6c (STRIDE for `comp.webhooks`):** `Spoofing` (no caller authentication),
+- **Stage 2 (classify):** `new_entry_point`, `trust_boundary_crossing`, `control_change`.
+- **Stage 3 (STRIDE for `comp.webhooks`):** `Spoofing` (no caller authentication),
   `Tampering` (attacker-controlled body drives execution), `DenialOfService`
   (unauthenticated, unbounded synchronous runs) and `ElevationOfPrivilege` (runs
   workflows that use stored credentials).
-- **6d (assumptions):** violates `asm.webhooks_authenticated`,
+- **Stage 4 (assumptions):** violates `asm.webhooks_authenticated`,
   `asm.no_unauthenticated_execution` and `asm.public_endpoints_rate_limited`.
-- **6e (score):** **tiered, deterministically** — the assumption violations guard a
+- **Stage 5 (score):** **tiered, deterministically** — the assumption violations guard a
   high-sensitivity asset, so they are **High** (needs human review); the
   component's change-signals collapse into a single **Medium** delta that lists
   them all (new entry point, trust-boundary crossing, control change) with the
   full STRIDE set. Four deltas total — three High + one Medium.
 
 This tiering is the point of deterministic severity: the model supplies the same
-facts either way, and §7 rules — not the model — decide what blocks a reviewer's
+facts either way, and the severity rules — not the model — decide what blocks a reviewer's
 attention.
 
 ## Files
@@ -48,7 +48,7 @@ attention.
 |---|---|
 | `threat-model.yaml` | Baseline: 3 assets, 3 trust boundaries, 5 components, 3 assumptions. Passes `validate`. |
 | `pr-public-trigger.diff` | The PR under review. |
-| `pr-public-trigger.annotations.json` | Step-5 static-analysis annotations. |
+| `pr-public-trigger.annotations.json` | Static-analysis annotations. |
 | `generate_report.py` | Runs the pipeline with the scripted model and writes `report/`. |
 | `report/threat-delta.md` · `.sarif` · `deltas.json` | The generated outputs. |
 

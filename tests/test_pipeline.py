@@ -1,7 +1,7 @@
-"""End-to-end integration tests for the orchestration + 6e assembly.
+"""End-to-end integration tests for the orchestration + Stage 5 assembly.
 
-The centrepiece reproduces the spec §12 worked example: a new public HTTP route
-added to the (internal) User Service. With a scripted model returning the §12
+The centrepiece reproduces the worked example: a new public HTTP route
+added to the (internal) User Service. With a scripted model returning the worked-example
 flags, STRIDE and violations, the pipeline must produce a HIGH-severity,
 human-review delta set that crosses a trust boundary into an internal component
 and contradicts the stated assumptions.
@@ -77,11 +77,11 @@ def baseline():
 
 
 def _worked_example_llm():
-    # Scripted to the §12 outputs: classification flags, user_service STRIDE,
+    # Scripted to the worked-example outputs: classification flags, user_service STRIDE,
     # and the two assumption violations.
     return ScriptedLLMClient(
         responses={
-            # 6b classification — keyed on a label present in that prompt only.
+            # Stage 2 classification — keyed on a label present in that prompt only.
             "is it plausibly introduced": {
                 "new_entry_point": True,
                 "trust_boundary_crossing": True,
@@ -89,7 +89,7 @@ def _worked_example_llm():
                 "new_data_flow": False,
                 "control_change": False,
             },
-            # 6c STRIDE — keyed on the component id present in the stride prompt.
+            # Stage 3 STRIDE — keyed on the component id present in the stride prompt.
             "comp.user_service (zone": {
                 "deltas": [
                     {"stride": "InformationDisclosure", "reason": "returns full PII without authz"},
@@ -97,7 +97,7 @@ def _worked_example_llm():
                     {"stride": "Spoofing", "reason": "no caller authentication on new route"},
                 ]
             },
-            # 6d assumptions — fanned out one call per assumption, keyed on the
+            # Stage 4 assumptions — fanned out one call per assumption, keyed on the
             # assumption id echoed in each single-assumption prompt.
             "asm.no_direct_internal_ingress": {
                 "assumption_id": "asm.no_direct_internal_ingress", "violated": True,
@@ -129,7 +129,7 @@ def test_worked_example_high_severity(baseline):
     assert all(d.delta_id.startswith("td-1234-") for d in result.deltas)
 
     types = {d.type for d in result.deltas}
-    # New entry point on an internal component -> HIGH (§7).
+    # New entry point on an internal component -> HIGH.
     assert DeltaType.NEW_ENTRY_POINT in types
     # Assumption violations surfaced and tied to known assumptions.
     av = [d for d in result.deltas if d.type == DeltaType.ASSUMPTION_VIOLATION]
@@ -140,7 +140,7 @@ def test_worked_example_high_severity(baseline):
     for d in av:
         assert d.severity == Severity.HIGH  # guards high-sensitivity asset
 
-    # new_entry_point delta carries STRIDE from 6c and a baseline-update proposal.
+    # new_entry_point delta carries STRIDE from Stage 3 and a baseline-update proposal.
     nep = next(d for d in result.deltas if d.type == DeltaType.NEW_ENTRY_POINT)
     assert nep.stride, "STRIDE should be attached to the entry-point delta"
     assert nep.requires_human_review
@@ -164,7 +164,7 @@ def test_untracked_path_emits_low_delta(baseline):
         "@@ -1 +1 @@\n-old\n+new\n",
         pr="77",
     )
-    # Stub model: nothing positive. Only the 6a untracked-path delta should appear.
+    # Stub model: nothing positive. Only the Stage 1 untracked-path delta should appear.
     result = analyze(diff, baseline, [], [], ScriptedLLMClient(default={}), pr="77")
     assert len(result.deltas) == 1
     d = result.deltas[0]
@@ -199,14 +199,14 @@ def test_no_match_no_untracked_exits_empty(baseline):
 
 
 def test_flags_gate_skips_6c_6d(baseline):
-    # When 6b returns all-false, 6c/6d must not call the model (spec §6b gate).
+    # When Stage 2 returns all-false, Stages 3/4 must not call the model (gate).
     diff = parse_unified_diff(
         "diff --git a/src/users/util.py b/src/users/util.py\n"
         "--- a/src/users/util.py\n+++ b/src/users/util.py\n"
         "@@ -1 +1 @@\n-a\n+b\n",
         pr="5",
     )
-    llm = ScriptedLLMClient(default={})  # 6b -> all false
+    llm = ScriptedLLMClient(default={})  # Stage 2 -> all false
     analyze(diff, baseline, [], [], llm, pr="5")
-    # Exactly one call (6b). 6c and 6d skipped.
+    # Exactly one call (Stage 2). Stages 3 and 4 skipped.
     assert len(llm.calls) == 1

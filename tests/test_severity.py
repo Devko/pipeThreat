@@ -1,4 +1,4 @@
-"""Tests for the deterministic severity rules (spec §7)."""
+"""Tests for the deterministic severity rules."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ def test_asset_floor_low_or_none():
 
 
 # --------------------------------------------------------------------------- #
-# compute_severity — each §7 row
+# compute_severity — each severity row
 # --------------------------------------------------------------------------- #
 
 def test_critical_asset_forces_high():

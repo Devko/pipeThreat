@@ -1,13 +1,13 @@
-"""Standalone pipeline entry point for step 6 (Threat-Model Delta).
+"""Standalone entry point for the Threat-Model Delta analysis.
 
-A larger CI pipeline orchestrates many steps; this module exposes step 6 as a
+This module exposes the analysis as a
 *single callable* — :func:`run_step` — that an orchestrator can drop in without
-knowing anything about the internal stages (6a–6e).
+knowing anything about the internal stages (Stages 1–5).
 
 It accepts either filesystem paths *or* already-constructed objects for every
 input, loads whatever is given as a path, runs the full analysis, and returns an
 :class:`~threat_delta.pipeline.AnalysisResult` that exposes ``.deltas``,
-``.sarif`` and ``.comment``. The step is advisory: it returns results and never
+``.sarif`` and ``.comment``. The analysis is advisory: it returns results and never
 raises on "findings exist"; gating is the caller's choice (see
 ``AnalysisResult`` / :func:`needs_human_review`).
 """
@@ -43,14 +43,14 @@ def run_step(
     max_hunk_chars: int = 4000,
     prior: PriorInput = None,
 ) -> AnalysisResult:
-    """Run the Threat-Model Delta step as one standalone pipeline function.
+    """Run the Threat-Model Delta analysis as one standalone function.
 
     Every input may be a path (``str``/``Path``) or an in-memory object:
 
     * ``baseline`` — path to ``threat-model.yaml`` or a :class:`Baseline`.
     * ``diff`` — path to a unified/structured diff or a :class:`Diff`.
-    * ``annotations`` — step-5 annotations path / list / ``None``.
-    * ``findings`` — step 2-4 findings path / list / ``None``.
+    * ``annotations`` — static-analysis annotations path / list / ``None``.
+    * ``findings`` — SAST/secrets/CVE findings path / list / ``None``.
     * ``llm`` — an :class:`LLMClient`; **required**. Pass
       ``build_client("ollama"|"openai", ...)`` to analyze against a real model, or
       an explicit ``ScriptedLLMClient`` for offline tests. There is deliberately
@@ -87,9 +87,9 @@ def run_step(
 
 
 def needs_human_review(result: AnalysisResult) -> list[Delta]:
-    """High-severity deltas that require human review (spec §9 gate input).
+    """High-severity deltas that require human review (gate input).
 
-    The standalone step never decides the build outcome itself; an orchestrator
+    The standalone analysis never decides the build outcome itself; an orchestrator
     that wants the optional required-review hook can call this and act on a
     non-empty list (e.g. set the ``security/needs-review`` label).
     """

@@ -1,6 +1,6 @@
 # Worked example — Matrix Synapse
 
-A complete, end-to-end run of the Threat-Model Delta step against a real,
+A complete, end-to-end run of the Threat-Model Delta analysis against a real,
 recognizable open-source project ([Matrix Synapse](https://github.com/element-hq/synapse)),
 showing the inputs and the generated report.
 
@@ -9,7 +9,7 @@ showing the inputs and the generated report.
 > threat model for the project. The committed report is generated with a **scripted
 > model** (so it's deterministic and reproducible without a model server),
 > representing what a small local model returns for this diff. Everything else —
-> relevance, the deterministic §7 severity, dedup, and SARIF/comment rendering — is
+> relevance, the deterministic severity, dedup, and SARIF/comment rendering — is
 > the real pipeline. Run it live with `--llm ollama` (see below).
 
 ## The files
@@ -18,7 +18,7 @@ showing the inputs and the generated report.
 |---|---|
 | `threat-model.yaml` | The baseline: 5 assets, 3 trust boundaries, 7 components, 5 assumptions. Passes `threat-delta validate`. |
 | `pr-account-export.diff` | The PR under review (see below). |
-| `pr-account-export.annotations.json` | Step-5 static-analysis annotations for the changed file. |
+| `pr-account-export.annotations.json` | Static-analysis annotations for the changed file. |
 | `generate_report.py` | Runs the pipeline with the scripted model and writes `report/`. |
 | `report/threat-delta.md` | The generated PR comment. |
 | `report/threat-delta.sarif` | The generated SARIF 2.1.0 log. |
@@ -33,22 +33,22 @@ from the query string** and returns that user's profile, account data and recent
 room events — with **no access-token check, no admin check, and no binding of the
 caller to the requested user**.
 
-A plain linter might note "missing auth". The delta step explains *why it matters
+A plain linter might note "missing auth". The delta analysis explains *why it matters
 at the system level*.
 
-## How the step reasons about it
+## How the analysis reasons about it
 
-- **6a (relevance):** `synapse/rest/client/**` → `comp.client_api` (zone `edge`,
+- **Stage 1 (relevance):** `synapse/rest/client/**` → `comp.client_api` (zone `edge`,
   handles `access_token` (critical), `message_content`, `account_data`). Pulls in
   all assumptions.
-- **6b (classify):** `new_entry_point: true`, `asset_handling_change: true`.
-- **6c (STRIDE for `comp.client_api`):** `InformationDisclosure` (returns any
+- **Stage 2 (classify):** `new_entry_point: true`, `asset_handling_change: true`.
+- **Stage 3 (STRIDE for `comp.client_api`):** `InformationDisclosure` (returns any
   user's data without authorization), `ElevationOfPrivilege` (non-admin reads
   arbitrary users' data), `Spoofing` (`user_id` not bound to the caller).
-- **6d (assumptions):** violates `asm.client_requires_token` (no token check),
+- **Stage 4 (assumptions):** violates `asm.client_requires_token` (no token check),
   `asm.admin_requires_admin` (returns others' data without admin) and
   `asm.user_scoped_access` (arbitrary `user_id`).
-- **6e (score):** severity is **High** deterministically — the component handles a
+- **Stage 5 (score):** severity is **High** deterministically — the component handles a
   `critical` asset and the change violates assumptions guarding sensitive assets.
   Four deltas (three assumption violations + one collapsed component delta that
   lists both change-signals), all `requires_human_review: true`, each with a

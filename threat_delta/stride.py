@@ -1,14 +1,14 @@
-"""Stage 6c — per-component STRIDE delta analysis (pipeline step 6).
+"""Stage 3 — per-component STRIDE delta analysis.
 
 For a single affected component this asks the model which STRIDE categories the
-change *newly introduces or worsens* for that component. It runs only when 6b
+change *newly introduces or worsens* for that component. It runs only when Stage 2
 produced at least one positive flag, and it sends the actual code change — but
 capped: the concatenated hunk text is deterministically truncated to
-``max_hunk_chars`` before the prompt is built (the spec's "summarize the hunk
-deterministically first" budget cap, §2/§11), so an oversized PR cannot blow the
-context window of a 4B model.
+``max_hunk_chars`` before the prompt is built (a "summarize the hunk
+deterministically first" budget cap), so an oversized PR cannot blow the
+context window of a small model.
 
-The parser is a hallucination guard (spec §11): any returned ``stride`` string
+The parser is a hallucination guard: any returned ``stride`` string
 that is not a valid :class:`Stride` value is dropped rather than coerced.
 """
 
@@ -120,9 +120,9 @@ def stride_deltas(
     max_hunk_chars: int = 4000,
     signals: list[str] | None = None,
 ) -> list[StrideDelta]:
-    """6c — STRIDE deltas this change introduces/worsens for ``component``.
+    """Stage 3 — STRIDE deltas this change introduces/worsens for ``component``.
 
-    Returns ``[]`` immediately when no flag is positive (nothing for 6c to do).
+    Returns ``[]`` immediately when no flag is positive (nothing for Stage 3 to do).
     Otherwise builds the per-component prompt (with a capped hunk body and the
     deterministic ``signals`` block), runs ``config.votes`` samples and keeps a
     STRIDE category when a **majority** of samples surfaced it. Each kept delta

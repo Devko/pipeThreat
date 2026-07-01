@@ -27,8 +27,8 @@ def test_run_step_accepts_paths(tmp_path):
     df = tmp_path / "pr.diff"
     df.write_text(UNTRACKED_DIFF, encoding="utf-8")
 
-    # All inputs as paths; an explicit stub LLM. Only the 6a untracked delta
-    # appears (6a is deterministic and never calls the model).
+    # All inputs as paths; an explicit stub LLM. Only the Stage 1 untracked delta
+    # appears (Stage 1 is deterministic and never calls the model).
     result = run_step(baseline=str(bl), diff=str(df), pr="42", llm=ScriptedLLMClient(default={}))
     assert len(result.deltas) == 1
     assert result.deltas[0].type.value == "untracked_path"
@@ -38,7 +38,7 @@ def test_run_step_accepts_paths(tmp_path):
 
 
 def test_run_step_accepts_objects_worked_example():
-    # All inputs as in-memory objects, with the scripted §12 model.
+    # All inputs as in-memory objects, with the scripted worked-example model.
     baseline = parse_baseline(BASELINE_DATA)
     diff = parse_unified_diff(WORKED_EXAMPLE_DIFF, pr="1234")
     annotations = [

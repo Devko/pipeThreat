@@ -1,12 +1,12 @@
-"""Shared data models for the Threat-Model Delta step (pipeline step 6).
+"""Shared data models for the Threat-Model Delta analysis.
 
 These dataclasses are the contract between every stage:
 
-    resolve_slice (6a)  -> Slice
-    classify_change (6b) -> Flags
-    stride_deltas (6c)   -> list[StrideDelta]
-    assumption_check (6d)-> list[Violation]
-    score_and_emit (6e)  -> (sarif, comment) built from list[Delta]
+    resolve_slice (Stage 1)   -> Slice
+    classify_change (Stage 2) -> Flags
+    stride_deltas (Stage 3)   -> list[StrideDelta]
+    assumption_check (Stage 4)-> list[Violation]
+    score_and_emit (Stage 5)  -> (sarif, comment) built from list[Delta]
 
 Nothing here performs I/O or calls an LLM; these are plain value objects so the
 deterministic and the model-driven stages can be developed and tested in
@@ -151,7 +151,7 @@ class ChangedFile:
 
 @dataclass
 class Diff:
-    """Output of step 1 (scope): the changed files for this PR."""
+    """The changed files for this PR (the PR diff)."""
     files: list[ChangedFile] = field(default_factory=list)
     pr: str = ""
 
@@ -162,7 +162,7 @@ class Diff:
 
 @dataclass
 class FileAnnotation:
-    """Output of step 5: static-analysis annotations for one file."""
+    """Static-analysis annotations for one file."""
     path: str
     entry_points: list[str] = field(default_factory=list)
     untrusted_inputs: list[str] = field(default_factory=list)
@@ -171,7 +171,7 @@ class FileAnnotation:
 
 @dataclass
 class Finding:
-    """Output of steps 2-4 (SAST / secrets / CVE) — optional correlation input."""
+    """SAST/secrets/CVE findings — optional correlation input."""
     id: str
     file: str
     severity: str = ""
@@ -184,7 +184,7 @@ class Finding:
 
 @dataclass
 class Slice:
-    """6a output — the relevant baseline slice that bounds all LLM context."""
+    """Stage 1 output — the relevant baseline slice that bounds all LLM context."""
     components: list[Component] = field(default_factory=list)
     trust_boundaries: list[TrustBoundary] = field(default_factory=list)
     data_flows: list[DataFlow] = field(default_factory=list)
@@ -201,7 +201,7 @@ class Slice:
 
 @dataclass
 class Flags:
-    """6b output — which delta-types are plausibly in play."""
+    """Stage 2 output — which delta-types are plausibly in play."""
     new_entry_point: bool = False
     new_data_flow: bool = False
     trust_boundary_crossing: bool = False
@@ -222,7 +222,7 @@ class Flags:
 
 @dataclass
 class StrideDelta:
-    """6c output item — one STRIDE category newly introduced/worsened."""
+    """Stage 3 output item — one STRIDE category newly introduced/worsened."""
     stride: Stride
     reason: str
     low_confidence: bool = False
@@ -233,7 +233,7 @@ class StrideDelta:
 
 @dataclass
 class Violation:
-    """6d output item — one assumption the change violates/weakens."""
+    """Stage 4 output item — one assumption the change violates/weakens."""
     assumption_id: str
     violated: bool
     reason: str
@@ -254,7 +254,7 @@ class ProposedBaselineUpdate:
 
 @dataclass
 class Delta:
-    """Final per-delta output object (see spec §8)."""
+    """Final per-delta output object."""
     delta_id: str
     pr: str
     type: DeltaType

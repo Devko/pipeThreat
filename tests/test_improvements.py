@@ -1,6 +1,6 @@
 """Tests for the detection/output improvements.
 
-Covers self-consistency voting (6b/6c), evidence-based confidence, region-level
+Covers self-consistency voting (Stages 2/3), evidence-based confidence, region-level
 SARIF locations, and incremental ``--since`` subtraction.
 """
 

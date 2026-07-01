@@ -1,7 +1,7 @@
-"""LLM client contract for the model-driven stages (6b/6c/6d).
+"""LLM client contract for the model-driven stages (Stages 2/3/4).
 
-The spec targets a local ~4B model on a CPU-only runner (Gemma 4 E4B class) with
-temperature=0 and a *capped* reasoning budget (spec §2, §11). The pipeline only
+The tool targets a small local model on a CPU-only runner (e.g. gemma4:e2b) with
+temperature=0 and a *capped* reasoning budget. The pipeline only
 ever needs one capability: send a system preamble + one narrow user prompt, get
 back a single JSON object. That is the whole interface.
 
@@ -10,9 +10,9 @@ Concrete transports (llama.cpp server, Ollama, etc.) implement
 returns canned JSON keyed by a tag in the prompt — so every deterministic stage
 can be exercised without a model.
 
-Robust JSON extraction lives here (``parse_json_object``) because a 4B will
-occasionally wrap output in prose or fences despite instructions; the call sites
-should not each reinvent that.
+Robust JSON extraction lives here (``parse_json_object``) because a small local
+model will occasionally wrap output in prose or fences despite instructions; the
+call sites should not each reinvent that.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 
-# Shared system preamble for all LLM calls (spec §6).
+# Shared system preamble for all LLM calls.
 SYSTEM_PREAMBLE = (
     "You are a security analysis function in a CI pipeline. You receive a small, "
     "pre-filtered context and answer ONE narrow question. Output ONLY valid JSON "
@@ -37,14 +37,14 @@ class LLMError(RuntimeError):
     """Raised when the model call fails or returns unusable output."""
 
 
-# Default per-stage reasoning budgets (spec §2: reasoning ON but *bounded* for
+# Default per-stage reasoning budgets (reasoning ON but *bounded* for
 # each narrow analysis call). Classification is a cheap gate so it gets the least;
 # the assumption check is the highest-signal, most bounded judgment so it gets a
-# little more. An uncapped 4B rambles and burns CPU wall-clock.
+# little more. An uncapped small model rambles and burns CPU wall-clock.
 DEFAULT_STAGE_BUDGETS = {
-    "classify": 128,     # 6b — coarse yes/no flags
-    "stride": 256,       # 6c — STRIDE deltas over one hunk
-    "assumptions": 384,  # 6d — exhaustive assumption contradiction check
+    "classify": 128,     # Stage 2 — coarse yes/no flags
+    "stride": 256,       # Stage 3 — STRIDE deltas over one hunk
+    "assumptions": 384,  # Stage 4 — exhaustive assumption contradiction check
 }
 
 
@@ -55,7 +55,7 @@ class LLMConfig:
     # Room for a thinking model (e.g. gemma4:e2b) to reason *and* still emit the
     # JSON answer; a tighter cap can leave `content` empty after the thinking.
     max_tokens: int = 1536
-    # Reasoning/thinking ON for the analysis calls, but capped (spec §2/§11).
+    # Reasoning/thinking ON for the analysis calls, but capped.
     reasoning: bool = True
     # Fallback cap used when a stage has no explicit per-stage budget.
     reasoning_budget_tokens: int = 256
@@ -63,7 +63,7 @@ class LLMConfig:
     stage_reasoning_budgets: dict = field(
         default_factory=lambda: dict(DEFAULT_STAGE_BUDGETS)
     )
-    # Generous default: a ~4B model on a cold CPU runner can take minutes for the
+    # Generous default: a small local model on a cold CPU runner can take minutes for the
     # first inference (model load + generation).
     timeout_s: float = 300.0
     # Self-consistency voting: sample each narrow call ``votes`` times and keep
@@ -258,7 +258,7 @@ class ScriptedLLMClient(LLMClient):
 
     ``responses`` maps a substring *tag* (expected to appear in the prompt) to the
     dict that should be returned. The first matching tag wins; if nothing matches,
-    ``default`` is returned. This lets tests script 6b/6c/6d independently.
+    ``default`` is returned. This lets tests script Stages 2/3/4 independently.
     """
 
     def __init__(

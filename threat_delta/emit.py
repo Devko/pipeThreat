@@ -1,6 +1,6 @@
-"""Stage 6e — output emitters: SARIF log and PR comment (spec §6e, §8, §9).
+"""Stage 5 — output emitters: SARIF log and PR comment.
 
-This step is *advisory / non-blocking* (spec §9): it must never fail a build.
+This analysis is *advisory / non-blocking*: it must never fail a build.
 Accordingly the SARIF ``level`` mapping never uses ``"error"`` — high/medium map
 to ``"warning"`` and low maps to ``"note"``. The PR comment groups deltas by
 severity and surfaces, per delta, the type, affected element(s), STRIDE
@@ -39,11 +39,11 @@ SARIF_SCHEMA = (
 
 
 # --------------------------------------------------------------------------- #
-# Level mapping (spec §9 — never block the build)
+# Level mapping (never block the build)
 # --------------------------------------------------------------------------- #
 
 def _sarif_level(severity: Severity) -> str:
-    """Map severity to a SARIF level (spec §9: advisory — never ``"error"``).
+    """Map severity to a SARIF level (advisory — never ``"error"``).
 
     high -> "warning", medium -> "warning", low -> "note".
     """
@@ -54,7 +54,7 @@ def _sarif_level(severity: Severity) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# SARIF (spec §6e, §8)
+# SARIF
 # --------------------------------------------------------------------------- #
 
 def _rules_for(deltas: list[Delta]) -> list[dict]:
@@ -103,7 +103,7 @@ def _locations_for(delta: Delta) -> list[dict]:
 
 
 def _result_properties(delta: Delta) -> dict:
-    """The per-result properties bag (spec §8 fields)."""
+    """The per-result properties bag."""
     props: dict = {
         "severity": delta.severity.value,
         "confidence": delta.confidence.value,
@@ -130,7 +130,7 @@ def build_sarif(
     tool_name: str = "threat-model-delta",
     info_uri: str = "https://github.com/Devko/pipeThreat",
 ) -> dict:
-    """Build a SARIF 2.1.0 log from the deltas (spec §6e, §8).
+    """Build a SARIF 2.1.0 log from the deltas.
 
     One ``result`` per delta; ``ruleId`` is the delta type; ``level`` is the
     advisory mapping (warning/note, never error). ``tool.driver.rules`` holds one
@@ -169,7 +169,7 @@ def build_sarif(
 
 
 # --------------------------------------------------------------------------- #
-# PR comment (spec §9)
+# PR comment
 # --------------------------------------------------------------------------- #
 
 _SEVERITY_SECTIONS = (
@@ -187,7 +187,7 @@ _ADVISORY_HEADER = (
 
 
 def _format_delta(delta: Delta) -> str:
-    """Render one delta as a Markdown sub-block (spec §9 fields)."""
+    """Render one delta as a Markdown sub-block."""
     elements = ", ".join(f"`{e}`" for e in delta.affected_elements) or "_(none)_"
     lines: list[str] = []
     title = f"- **{delta.type.value}** — affected: {elements}"
@@ -298,7 +298,7 @@ def _format_section(group: list[Delta], comp_index: dict[str, Delta]) -> str:
 
 
 def build_comment(deltas: list[Delta]) -> str:
-    """Render the PR comment grouping deltas by severity (spec §9).
+    """Render the PR comment grouping deltas by severity.
 
     Within each severity band, several assumption violations that stem from one
     component change are consolidated into a single root-caused block, so a
@@ -318,7 +318,7 @@ def build_comment(deltas: list[Delta]) -> str:
         parts.append(f"### {label} ({len(group)})")
         parts.append(_format_section(group, comp_index))
 
-    # Footer: counts + the security/needs-review label hook (spec §9).
+    # Footer: counts + the security/needs-review label hook.
     counts = {
         label: sum(1 for d in deltas if d.severity == sev)
         for sev, label in _SEVERITY_SECTIONS
@@ -344,7 +344,7 @@ def build_comment(deltas: list[Delta]) -> str:
 # --------------------------------------------------------------------------- #
 
 def write_outputs(deltas: list[Delta], sarif_path: str, comment_path: str) -> None:
-    """Write the SARIF JSON and the Markdown comment to disk (spec §6e)."""
+    """Write the SARIF JSON and the Markdown comment to disk."""
     with open(sarif_path, "w", encoding="utf-8") as fh:
         json.dump(build_sarif(deltas), fh, indent=2)
     with open(comment_path, "w", encoding="utf-8") as fh:

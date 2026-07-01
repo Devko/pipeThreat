@@ -1,4 +1,4 @@
-"""Threat-Model Delta — pipeline step 6 (advisory, non-blocking).
+"""Threat-Model Delta analysis (advisory, non-blocking).
 
 Evaluates a PR as a *delta* against a human-authored threat-model baseline:
 deterministic code does breadth (relevance, severity, gating); a small local LLM

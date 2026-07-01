@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "threat-delta"
 version = "0.1.0"
-description = "Pipeline Step 6 — Threat-Model Delta Analysis (advisory, CPU-only, local ~4B LLM)"
+description = "Threat-Model Delta Analysis — advisory, CPU-only, local-LLM PR threat review"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }

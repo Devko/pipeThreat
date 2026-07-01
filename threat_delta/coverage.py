@@ -1,11 +1,11 @@
 """Baseline-coverage report — how completely a baseline's component
-``code_paths`` cover a repository's source files (spec §6a / §10).
+``code_paths`` cover a repository's source files.
 
 This is a deterministic, no-LLM measurement of *baseline completeness*: it
 answers "which source files does the threat-model baseline already account for,
 and which fall through the cracks?". Closing those gaps deliberately (by adding
 ``code_paths`` to components) is preferable to discovering them only as
-``untracked_path`` drift on individual PRs (spec §10).
+``untracked_path`` drift on individual PRs.
 
 Glob matching is reused from :func:`threat_delta.relevance.path_matches`; this
 module never reimplements it.
@@ -48,7 +48,7 @@ _UNCOVERED_LISTING_CAP = 50
 
 @dataclass
 class CoverageReport:
-    """Result of :func:`compute_coverage` (spec §6a / §10)."""
+    """Result of :func:`compute_coverage`."""
 
     # component_id -> matched source paths (sorted, deduplicated)
     covered: dict[str, list[str]] = field(default_factory=dict)
@@ -93,7 +93,7 @@ class CoverageReport:
 # --------------------------------------------------------------------------- #
 
 def compute_coverage(baseline: Baseline, paths: list[str]) -> CoverageReport:
-    """Report how completely ``baseline`` covers ``paths`` (spec §6a / §10).
+    """Report how completely ``baseline`` covers ``paths``.
 
     Each distinct path is tested against every component's ``code_paths`` globs
     via :func:`threat_delta.relevance.path_matches`. A path is *covered* if it

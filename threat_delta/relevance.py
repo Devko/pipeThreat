@@ -1,8 +1,8 @@
-"""Stage 6a — deterministic relevance resolution.
+"""Stage 1 — deterministic relevance resolution.
 
 Given a parsed :class:`~threat_delta.models.Diff` and the loaded
 :class:`~threat_delta.baseline.Baseline`, resolve the changed paths to the
-*slice* of baseline elements they affect (spec §6a). This slice bounds all
+*slice* of baseline elements they affect. This slice bounds all
 context handed to the later (LLM-driven) stages, so it must be deterministic:
 elements are emitted in the baseline's declared order with no reliance on set
 iteration order.
@@ -72,16 +72,16 @@ def path_matches(path: str, pattern: str) -> bool:
 
 
 # --------------------------------------------------------------------------- #
-# Slice resolution (6a)
+# Slice resolution (Stage 1)
 # --------------------------------------------------------------------------- #
 
 def resolve_slice(diff: Diff, baseline: Baseline) -> Slice:
-    """Resolve a diff to the affected baseline slice (spec §6a).
+    """Resolve a diff to the affected baseline slice.
 
     Each changed path is matched against every component's ``code_paths`` globs.
     Matched components pull in the data-flows that reference them, the trust
     boundaries those flows cross, and the assets the components handle. All
-    assumptions are always included (they are checked exhaustively in 6d).
+    assumptions are always included (they are checked exhaustively in Stage 4).
     Unmatched paths are recorded as ``untracked_paths``.
     """
     affected_components: set[str] = set()

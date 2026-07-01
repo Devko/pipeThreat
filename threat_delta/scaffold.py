@@ -1,11 +1,11 @@
 """Scaffold a starter ``threat-model.yaml`` from a repository's layout.
 
-The whole step presumes a *human-authored* baseline (spec §3): the threat model
+The whole analysis presumes a *human-authored* baseline: the threat model
 is the context every downstream stage reasons against, so it must be written and
 approved by a person and committed alongside the code. That is a hard
 precondition — there is nothing to compute a delta *against* until it exists.
 
-This module supports "bootstrap-by-drift" for the maintenance loop (spec §10):
+This module supports "bootstrap-by-drift" for the maintenance loop:
 when a repo has no baseline yet, we deterministically derive a *skeleton* from
 the directory layout — no LLM, no guessing about security properties — that a
 human then reviews, fills in, and commits. The generated file is intentionally
@@ -146,8 +146,8 @@ _BANNER = """\
 # GENERATED THREAT-MODEL SKELETON — NOT YET AUTHORITATIVE.
 #
 # This file was scaffolded automatically from the repository's directory layout
-# (deterministic, no LLM). The whole Threat-Model Delta step presumes a
-# *human-authored*, *human-approved* baseline (spec §3): nothing below is a real
+# (deterministic, no LLM). The whole Threat-Model Delta analysis presumes a
+# *human-authored*, *human-approved* baseline: nothing below is a real
 # security assertion yet.
 #
 # Before committing:

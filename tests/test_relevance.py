@@ -1,4 +1,4 @@
-"""Tests for stage 6a — deterministic relevance resolution."""
+"""Tests for Stage 1 — deterministic relevance resolution."""
 
 from __future__ import annotations
 

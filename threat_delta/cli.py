@@ -2,10 +2,10 @@
 
 Subcommands:
 
-    analyze    run the step on a PR diff (the default; spec §5/§9)
-    init       scaffold a starter threat-model.yaml from the repo layout (§3)
-    validate   check baseline referential integrity (baseline-as-code, §3)
-    coverage   report which source paths no component claims (§6a/§10)
+    analyze    run the analysis on a PR diff (the default)
+    init       scaffold a starter threat-model.yaml from the repo layout
+    validate   check baseline referential integrity (baseline-as-code)
+    coverage   report which source paths no component claims
 
 ``analyze`` is the default: invoking ``threat-delta --baseline ... --diff ...``
 with no subcommand still routes to it, so existing callers (the GitHub Action)
@@ -39,7 +39,7 @@ def _build_llm(args: argparse.Namespace) -> LLMClient:
     offline, conservative client (reports nothing rather than hallucinating) for
     dry-runs and tests.
     """
-    # Reasoning is ON by default (spec §2): on a small model like gemma4:e2b it
+    # Reasoning is ON by default: on a small model like gemma4:e2b it
     # is affordable on CPU and gives the best results (richer STRIDE + the
     # assumption checks). `--no-think` disables it for a larger/slower model.
     config = LLMConfig(
@@ -97,7 +97,7 @@ def _add_llm_args(p: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="threat-delta",
-        description="Threat-model delta analysis and baseline tooling (pipeline step 6).",
+        description="Threat-model delta analysis and baseline tooling.",
     )
     sub = p.add_subparsers(dest="command")
 
@@ -152,8 +152,8 @@ def build_parser() -> argparse.ArgumentParser:
 def _add_analyze_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--baseline", required=True, help="path to threat-model.yaml")
     p.add_argument("--diff", required=True, help="unified diff or structured .json")
-    p.add_argument("--annotations", help="step-5 annotations JSON (optional)")
-    p.add_argument("--findings", help="step 2-4 findings JSON (optional)")
+    p.add_argument("--annotations", help="static-analysis annotations JSON (optional)")
+    p.add_argument("--findings", help="SAST/secrets/CVE findings JSON (optional)")
     p.add_argument("--pr", default="", help="PR number/identifier")
     p.add_argument(
         "--since",
@@ -170,14 +170,14 @@ def _add_analyze_args(p: argparse.ArgumentParser) -> None:
         "--max-hunk-chars",
         type=int,
         default=4000,
-        help="per-component hunk budget for 6c (default: 4000)",
+        help="per-component hunk budget for the STRIDE stage (default: 4000)",
     )
     p.add_argument(
         "--fail-on-high",
         action="store_true",
         help=(
             "exit non-zero if any high-severity delta requires human review "
-            "(optional required-review hook, spec §9; off by default)"
+            "(optional required-review hook; off by default)"
         ),
     )
 
@@ -221,7 +221,7 @@ def _cmd_analyze(args: argparse.Namespace) -> int:
         )
         return 1
 
-    # Advisory/non-blocking by default (spec §9).
+    # Advisory/non-blocking by default.
     return 0
 
 
@@ -238,7 +238,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
         else:
             # LLM-assisted draft: deterministic discovers components/code_paths;
             # the model fills the per-component judgment fields over bounded
-            # inputs. Output is a DRAFT requiring human review (spec §3).
+            # inputs. Output is a DRAFT requiring human review.
             from .scaffold_llm import init_baseline_llm
 
             text = init_baseline_llm(
@@ -254,7 +254,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
     if args.out:
         kind = "skeleton" if args.llm == "stub" else "LLM-assisted DRAFT"
         print(f"Wrote baseline {kind} to {args.out}", file=sys.stderr)
-        print("Review and edit it, then commit it as source (spec §3).", file=sys.stderr)
+        print("Review and edit it, then commit it as source.", file=sys.stderr)
     else:
         print(text)
     return 0

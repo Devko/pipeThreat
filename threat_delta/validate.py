@@ -1,8 +1,8 @@
 """Deterministic referential-integrity validation of a threat-model baseline.
 
-The baseline (threat-model.yaml) is the *context* the whole step depends on
-(spec §3, baseline-as-code precondition). Every later stage — relevance (6a),
-classification (6b), STRIDE deltas (6c), assumption checks (6d) — resolves diffs
+The baseline (threat-model.yaml) is the *context* the whole analysis depends on
+(baseline-as-code precondition). Every later stage — relevance (Stage 1),
+classification (Stage 2), STRIDE deltas (Stage 3), assumption checks (Stage 4) — resolves diffs
 against the ids declared here, so a malformed or dangling baseline must fail CI
 fast rather than silently produce wrong deltas downstream.
 
@@ -52,7 +52,7 @@ def validate_baseline(baseline: Baseline) -> list[Issue]:
 
     Lists are iterated in their declared order so the output is deterministic.
     Most findings are errors; coverage/style findings are warnings (see the
-    module docstring and spec §3).
+    module docstring).
     """
     issues: list[Issue] = []
 
@@ -100,7 +100,7 @@ def validate_baseline(baseline: Baseline) -> list[Issue]:
                     "warning",
                     "no_code_paths",
                     f"component {comp.id} has no code_paths and can never be "
-                    f"matched by relevance (6a)",
+                    f"matched by relevance (Stage 1)",
                 )
             )
         if not comp.trust_zone:

@@ -1,9 +1,9 @@
 """Deterministic change-signals — grounding facts for the model-driven stages.
 
-The model-driven stages (6c/6d) work better when they are handed *facts the
+The model-driven stages (Stages 3/4) work better when they are handed *facts the
 pipeline already knows deterministically* rather than asked to imagine a threat
 from a raw hunk. This module derives a small, bounded set of such facts — from
-the static-analysis annotations (step 5) and a keyword scan of the **added**
+the static-analysis annotations and a keyword scan of the **added**
 diff lines only — and the prompt builders inject them as a labelled data block.
 
 This keeps the project's thesis intact: deterministic code does the breadth
@@ -14,7 +14,7 @@ here calls a model; everything is reproducible.
 The scan is intentionally conservative — a handful of well-understood security
 keywords — so a signal means "this token literally appears in the added code",
 never an inference. Signals are phrased as neutral observations, not
-instructions, and are passed as data (spec §11, prompt-injection mitigation).
+instructions, and are passed as data (prompt-injection mitigation).
 """
 
 from __future__ import annotations
@@ -97,7 +97,7 @@ def signals_for_paths(
 ) -> list[str]:
     """Deterministic grounding facts for the given changed ``paths``.
 
-    Combines step-5 annotations (entry points / untrusted inputs / sinks) with a
+    Combines static-analysis annotations (entry points / untrusted inputs / sinks) with a
     keyword scan of the added lines. Returns short, de-duplicated, neutral
     observation strings — or ``[]`` when nothing notable is found.
     """

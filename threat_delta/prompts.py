@@ -1,10 +1,10 @@
-"""Prompt templates for the model-driven stages (pipeline step 6, stages 6b/6c/6d).
+"""Prompt templates for the model-driven stages (Stages 2/3/4).
 
-Pure string builders — no LLM calls, no I/O. Each renders one of the spec prompt
-bodies (spec §6) by filling placeholders with a compact, *data-only* projection
+Pure string builders — no LLM calls, no I/O. Each renders one of the prompt
+bodies by filling placeholders with a compact, *data-only* projection
 of the baseline slice, the static-analysis annotations and the diff.
 
-Prompt-injection mitigation (spec §11): every value derived from a diff, an
+Prompt-injection mitigation: every value derived from a diff, an
 annotation, an assumption statement or any other untrusted source is included
 verbatim **as data**, under a clearly labelled section header, and is never
 concatenated into the prompt as if it were an instruction. The section labels
@@ -39,7 +39,7 @@ def format_slice_refs(slice: Slice) -> str:
     Emits one line per component, trust boundary and asset (and data flow) —
     ids, names and zone/handles/entry-point *references* only, never full
     prose — so the model sees the structure of the slice without burning the
-    context budget (spec §6).
+    context budget.
     """
     lines: list[str] = []
     for c in slice.components:
@@ -62,7 +62,7 @@ def format_slice_refs(slice: Slice) -> str:
 
 def format_annotations(annotations: list[FileAnnotation]) -> str:
     """One ``path: entry_points=[...] untrusted_inputs=[...] sinks=[...]`` line
-    per annotated file (spec step 5 output). ``(none)`` when there are none."""
+    per annotated file (static-analysis output). ``(none)`` when there are none."""
     if not annotations:
         return "(none)"
     lines = []
@@ -79,7 +79,7 @@ def format_diff_summary(diff: Diff) -> str:
     """Per-file path plus its hunk headers — never the full hunk bodies.
 
     Keeps the classification/assumption prompts short; the full hunk text is
-    only ever sent to the per-component STRIDE stage (6c), and even there it is
+    only ever sent to the per-component STRIDE stage (Stage 3), and even there it is
     capped (see :func:`stride.stride_deltas`).
     """
     if not diff.files:
@@ -95,7 +95,7 @@ def format_diff_summary(diff: Diff) -> str:
 
 
 def format_assumptions(assumptions: list[Assumption]) -> str:
-    """Numbered ``id: statement`` lines (spec §6 6d input). ``(none)`` if empty."""
+    """Numbered ``id: statement`` lines (Stage 4 input). ``(none)`` if empty."""
     if not assumptions:
         return "(none)"
     return "\n".join(
@@ -104,7 +104,7 @@ def format_assumptions(assumptions: list[Assumption]) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Prompt bodies (reproduced faithfully from the spec, §6)
+# Prompt bodies
 # --------------------------------------------------------------------------- #
 
 def classification_prompt(
@@ -112,7 +112,7 @@ def classification_prompt(
     diff: Diff,
     annotations: list[FileAnnotation],
 ) -> str:
-    """6b — delta-type classification prompt body."""
+    """Stage 2 — delta-type classification prompt body."""
     return (
         "Affected threat-model elements:\n"
         f"{format_slice_refs(slice)}\n"
@@ -146,7 +146,7 @@ def _positive_flag_names(flags: Flags) -> list[str]:
 
 
 def _signals_section(signals: list[str] | None) -> str:
-    """Optional labelled data block of deterministic grounding facts (6c/6d)."""
+    """Optional labelled data block of deterministic grounding facts (Stages 3/4)."""
     if not signals:
         return ""
     body = "\n".join(f"- {s}" for s in signals)
@@ -159,7 +159,7 @@ def stride_prompt(
     flags: Flags,
     signals: list[str] | None = None,
 ) -> str:
-    """6c — per-component STRIDE delta prompt body."""
+    """Stage 3 — per-component STRIDE delta prompt body."""
     return (
         f"Component: {component.id} (zone: {component.trust_zone}, "
         f"handles: {_fmt_list(component.handles_assets)}, "
@@ -184,7 +184,7 @@ def assumption_prompt(
     annotations: list[FileAnnotation],
     signals: list[str] | None = None,
 ) -> str:
-    """6d — batched assumption-violation prompt body (all assumptions at once)."""
+    """Stage 4 — batched assumption-violation prompt body (all assumptions at once)."""
     return (
         "Stated security assumptions:\n"
         f"{format_assumptions(assumptions)}\n"
@@ -208,7 +208,7 @@ def assumption_prompt_single(
     annotations: list[FileAnnotation],
     signals: list[str] | None = None,
 ) -> str:
-    """6d — single-assumption prompt body (one bounded call per assumption).
+    """Stage 4 — single-assumption prompt body (one bounded call per assumption).
 
     Fanning out one assumption per call keeps the question narrow, which a small
     local model answers far more reliably than a batched "judge this whole list"

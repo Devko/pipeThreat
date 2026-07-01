@@ -1,10 +1,10 @@
-"""Stage 6d — security-assumption violation check (pipeline step 6).
+"""Stage 4 — security-assumption violation check.
 
 Asks the model whether the change violates or weakens any of the threat model's
 *stated* security assumptions. Only assumptions present in the slice are sent, so
 the model reasons over a small, fixed set.
 
-Two guards (spec §11): the model is told to return only ``violated:true``
+Two guards: the model is told to return only ``violated:true``
 entries, but we re-filter on the returned ``violated`` flag anyway, and we drop
 any ``assumption_id`` that does not match an assumption we actually supplied (a
 hallucinated id must never reach scoring).
@@ -36,14 +36,14 @@ def assumption_check(
     *,
     signals: list[str] | None = None,
 ) -> list[Violation]:
-    """6d — assumptions this change violates/weakens, one bounded call each.
+    """Stage 4 — assumptions this change violates/weakens, one bounded call each.
 
     Returns ``[]`` without calling the model when there are no assumptions.
     Otherwise **fans out one call per assumption** (a narrow yes/no question a
     small model answers far more reliably than a batched list), each voted
     ``config.votes`` times. An assumption is reported violated when a majority of
     its samples say so; the vote ``agreement`` is recorded. Unknown
-    ``assumption_id`` values are dropped (hallucination guard, spec §11).
+    ``assumption_id`` values are dropped (hallucination guard).
     """
     if not assumptions:
         return []

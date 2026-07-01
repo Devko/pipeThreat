@@ -1,4 +1,4 @@
-"""Tests for stage 6c (threat_delta.stride)."""
+"""Tests for Stage 3 (threat_delta.stride)."""
 
 from __future__ import annotations
 

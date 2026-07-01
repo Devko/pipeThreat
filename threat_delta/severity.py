@@ -1,12 +1,11 @@
-"""Stage 6e — deterministic severity scoring (spec §7).
+"""Stage 5 — deterministic severity scoring.
 
 Severity is *not* asked of the LLM: it is computed from facts (the delta type
 and the sensitivity of the assets/zones it touches) so that the same change
 always scores the same way, stable across runs. Confidence, by contrast, comes
-from the model; ``low_confidence`` is surfaced but never changes the severity
-(spec §7).
+from the model; ``low_confidence`` is surfaced but never changes the severity.
 
-Every branch below quotes the §7 rule it implements. All rows are evaluated and
+Every branch below quotes the severity rule it implements. All rows are evaluated and
 the MOST severe matching row wins — we start at :data:`Severity.LOW` and
 escalate via :meth:`Severity.escalate_to`.
 """
@@ -26,7 +25,7 @@ def _most_sensitive(assets: list[Asset]) -> Asset | None:
 # --------------------------------------------------------------------------- #
 
 def asset_floor(assets: list[Asset]) -> Severity:
-    """Severity floor implied by the most sensitive affected asset (spec §7).
+    """Severity floor implied by the most sensitive affected asset.
 
     * a ``critical``-sensitivity asset present -> floor HIGH
     * else a ``high``-sensitivity asset present -> floor MEDIUM
@@ -42,7 +41,7 @@ def asset_floor(assets: list[Asset]) -> Severity:
 
 
 # --------------------------------------------------------------------------- #
-# Severity table (spec §7)
+# Severity table
 # --------------------------------------------------------------------------- #
 
 def compute_severity(
@@ -55,11 +54,11 @@ def compute_severity(
     weakens_control: bool = False,
     untracked_in_finding: bool = False,
 ) -> Severity:
-    """Compute a delta's severity from the §7 table.
+    """Compute a delta's severity from the severity table.
 
     All rows are checked and the maximum (most severe) applies. Start from LOW
     and escalate; ``low_confidence`` is intentionally *not* an input here —
-    confidence never alters severity (spec §7).
+    confidence never alters severity.
     """
     severity = Severity.LOW  # "else -> LOW"
 
@@ -85,7 +84,7 @@ def compute_severity(
         severity = severity.escalate_to(Severity.MEDIUM)
 
     # "untracked_path -> LOW, but MEDIUM if the path also appears in a
-    #  step 2-4 finding"
+    #  SAST/secrets/CVE finding"
     if delta_type == DeltaType.UNTRACKED_PATH:
         severity = severity.escalate_to(
             Severity.MEDIUM if untracked_in_finding else Severity.LOW
@@ -99,7 +98,7 @@ def compute_severity(
 # --------------------------------------------------------------------------- #
 
 def confidence_from_flags(low_confidence: bool) -> Confidence:
-    """Map the model's ``low_confidence`` flag to a :class:`Confidence` (spec §7).
+    """Map the model's ``low_confidence`` flag to a :class:`Confidence`.
 
     ``low_confidence`` downgrades *nothing* (severity is independent), but it is
     surfaced: LOW when the model was unsure, else MEDIUM.
@@ -113,7 +112,7 @@ def confidence_from_evidence(
     corroborated: bool,
     agreement: float = 1.0,
 ) -> Confidence:
-    """Confidence from real signal, not a flat constant (spec §7).
+    """Confidence from real signal, not a flat constant.
 
     Confidence still never alters severity. It now reflects two facts the
     pipeline actually has:
@@ -148,7 +147,7 @@ def severity_rationale(
     weakens_control: bool = False,
     untracked_in_finding: bool = False,
 ) -> str:
-    """One line explaining which §7 rule set this severity.
+    """One line explaining which severity rule set this severity.
 
     Mirrors :func:`compute_severity`; names the dominant reason so a reviewer can
     audit the level instead of taking it on faith.

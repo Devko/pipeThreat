@@ -1,8 +1,8 @@
-"""Concrete LLM transports for the model-driven stages (pipeline step 6).
+"""Concrete LLM transports for the model-driven stages.
 
-The spec targets a local ~4B model on a CPU-only runner with temperature=0 and a
-*capped per-stage reasoning budget* (spec §2, §11: reasoning is ON but bounded so
-an uncapped 4B does not ramble and burn CPU wall-clock). This module ships a real
+The tool targets a small local model on a CPU-only runner with temperature=0 and a
+*capped per-stage reasoning budget* (reasoning is ON but bounded so
+an uncapped small model does not ramble and burn CPU wall-clock). This module ships a real
 transport against any OpenAI-compatible chat-completions endpoint — llama.cpp
 server, Ollama's ``/v1`` shim, vLLM and LM Studio all expose this shape — using
 only the Python standard library (``urllib``); no third-party dependencies.
@@ -103,7 +103,7 @@ class OpenAICompatibleClient(LLMClient):
             "max_tokens": self.config.max_tokens,
             "stream": False,
         }
-        # Bounded reasoning (spec §2/§11): temperature/max_tokens are hard caps;
+        # Bounded reasoning: temperature/max_tokens are hard caps;
         # the reasoning hint is best-effort and omitted when the budget is 0.
         if reasoning_budget > 0:
             body["reasoning_effort"] = self._reasoning_effort(reasoning_budget)

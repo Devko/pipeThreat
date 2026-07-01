@@ -1,4 +1,4 @@
-"""Tests for the LLM-assisted scaffold mode (spec §3 bootstrapping note).
+"""Tests for the LLM-assisted scaffold mode.
 
 The key guarantee: code owns id generation and referential integrity, so the
 bootstrapped draft always parses and validates with NO errors (no dangling asset

@@ -5,7 +5,7 @@ Runs the real pipeline (`threat_delta.run_step`) over the sample baseline, diff
 and annotations in this directory, and writes the SARIF + PR-comment report into
 ``report/``.
 
-The three model calls (6b/6c/6d) are driven by a **scripted model** so the report
+The three model calls (Stages 2/3/4) are driven by a **scripted model** so the report
 is deterministic and reproducible without a model server (the same technique the
 tests use). Everything else (relevance, severity, dedup, SARIF/comment rendering)
 is the real pipeline. Run it live instead with:
@@ -29,10 +29,10 @@ HERE = Path(__file__).resolve().parent
 PR = "29101"
 
 # What a small local model is expected to return for this PR, keyed by a unique
-# substring of each stage's prompt (6b / 6c-for-http_api / 6d).
+# substring of each stage's prompt (Stage 2 / Stage 3-for-http_api / Stage 4).
 SCRIPTED_MODEL = ScriptedLLMClient(
     responses={
-        # 6b — classification gate.
+        # Stage 2 — classification gate.
         "is it plausibly introduced or changed by this diff?": {
             "new_entry_point": True,
             "trust_boundary_crossing": True,
@@ -40,7 +40,7 @@ SCRIPTED_MODEL = ScriptedLLMClient(
             "asset_handling_change": False,
             "new_data_flow": False,
         },
-        # 6c — STRIDE deltas for the affected component (comp.http_api).
+        # Stage 3 — STRIDE deltas for the affected component (comp.http_api).
         "comp.http_api (zone": {
             "deltas": [
                 {
@@ -57,7 +57,7 @@ SCRIPTED_MODEL = ScriptedLLMClient(
                 },
             ]
         },
-        # 6d — assumption contradictions, fanned out one call per assumption and
+        # Stage 4 — assumption contradictions, fanned out one call per assumption and
         # keyed on the assumption id echoed in each single-assumption prompt.
         "asm.all_requests_authenticated": {
             "assumption_id": "asm.all_requests_authenticated",

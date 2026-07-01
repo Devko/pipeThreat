@@ -5,7 +5,7 @@ Runs the real pipeline (`threat_delta.run_step`) over the sample baseline, diff
 and annotations in this directory, and writes the SARIF + PR-comment report into
 ``report/``.
 
-The three model calls (6b/6c/6d) are driven by a **scripted model** so the report
+The three model calls (Stages 2/3/4) are driven by a **scripted model** so the report
 is deterministic and reproducible without a model server (the same technique the
 tests use). Everything else (relevance, severity, dedup, SARIF/comment rendering)
 is the real pipeline. Run it live instead with:
@@ -29,10 +29,10 @@ HERE = Path(__file__).resolve().parent
 PR = "17421"
 
 # What a Gemma-class model is expected to return for this PR, keyed by a unique
-# substring of each stage's prompt (6b / 6c-for-client_api / 6d).
+# substring of each stage's prompt (Stage 2 / Stage 3-for-client_api / Stage 4).
 SCRIPTED_MODEL = ScriptedLLMClient(
     responses={
-        # 6b — classification gate.
+        # Stage 2 — classification gate.
         "is it plausibly introduced or changed by this diff?": {
             "new_entry_point": True,
             "asset_handling_change": True,
@@ -40,7 +40,7 @@ SCRIPTED_MODEL = ScriptedLLMClient(
             "new_data_flow": False,
             "control_change": False,
         },
-        # 6c — STRIDE deltas for the affected component (comp.client_api).
+        # Stage 3 — STRIDE deltas for the affected component (comp.client_api).
         "comp.client_api (zone": {
             "deltas": [
                 {
@@ -57,7 +57,7 @@ SCRIPTED_MODEL = ScriptedLLMClient(
                 },
             ]
         },
-        # 6d — assumption contradictions, fanned out one call per assumption and
+        # Stage 4 — assumption contradictions, fanned out one call per assumption and
         # keyed on the assumption id echoed in each single-assumption prompt.
         "asm.client_requires_token": {
             "assumption_id": "asm.client_requires_token",

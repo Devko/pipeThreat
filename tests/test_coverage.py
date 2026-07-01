@@ -1,4 +1,4 @@
-"""Tests for threat_delta.coverage (baseline-coverage report, spec §6a / §10)."""
+"""Tests for threat_delta.coverage (baseline-coverage report)."""
 
 from __future__ import annotations
 

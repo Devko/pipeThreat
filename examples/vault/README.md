@@ -1,6 +1,6 @@
 # Worked example — HashiCorp Vault (Go)
 
-An end-to-end run of the Threat-Model Delta step against a real Go project,
+An end-to-end run of the Threat-Model Delta analysis against a real Go project,
 [HashiCorp Vault](https://github.com/hashicorp/vault). It's a second worked example
 (alongside the Python [Synapse](../synapse/) one) to show that `code_paths` and the
 whole pipeline are language-agnostic — and to surface a different STRIDE mix.
@@ -10,7 +10,7 @@ whole pipeline are language-agnostic — and to surface a different STRIDE mix.
 > threat model for the project. The committed report is generated with a **scripted
 > model** (deterministic and reproducible without a model server), representing
 > what a small local model returns for this diff. Everything else — relevance, the
-> deterministic §7 severity, dedup, and SARIF/comment rendering — is the real
+> deterministic severity, dedup, and SARIF/comment rendering — is the real
 > pipeline. Run it live with `--llm ollama` (see below).
 
 ## The PR
@@ -20,20 +20,20 @@ whole pipeline are language-agnostic — and to surface a different STRIDE mix.
 **raw stored value** at any path, reading **straight from the storage barrier** —
 with **no token required, no ACL policy check, and no audit-log entry**.
 
-A linter sees a new handler. The delta step sees that it punches through three of
+A linter sees a new handler. The delta analysis sees that it punches through three of
 Vault's core security boundaries at once.
 
-## How the step reasons about it
+## How the analysis reasons about it
 
-- **6a (relevance):** `http/**` → `comp.http_api` (zone `edge`, handles
+- **Stage 1 (relevance):** `http/**` → `comp.http_api` (zone `edge`, handles
   `asset.tokens` — critical). Pulls in all assumptions.
-- **6b (classify):** `new_entry_point`, `trust_boundary_crossing`, `control_change`.
-- **6c (STRIDE for `comp.http_api`):** `InformationDisclosure` (returns decrypted
+- **Stage 2 (classify):** `new_entry_point`, `trust_boundary_crossing`, `control_change`.
+- **Stage 3 (STRIDE for `comp.http_api`):** `InformationDisclosure` (returns decrypted
   secrets), `ElevationOfPrivilege` (reads any path with no ACL check), and
   **`Repudiation`** (the access leaves no audit trail).
-- **6d (assumptions):** violates `asm.all_requests_authenticated` (no token),
+- **Stage 4 (assumptions):** violates `asm.all_requests_authenticated` (no token),
   `asm.acl_enforced` (no policy check) and `asm.all_access_audited` (no audit entry).
-- **6e (score):** **High** deterministically — `comp.http_api` handles a `critical`
+- **Stage 5 (score):** **High** deterministically — `comp.http_api` handles a `critical`
   asset and the change violates assumptions guarding sensitive assets. Four deltas
   (three assumption violations + one collapsed component delta), all
   `requires_human_review: true`.
@@ -44,7 +44,7 @@ Vault's core security boundaries at once.
 |---|---|
 | `threat-model.yaml` | Baseline: 5 assets, 4 trust boundaries, 6 components, 4 assumptions. Passes `validate`. |
 | `pr-debug-inspect.diff` | The PR under review. |
-| `pr-debug-inspect.annotations.json` | Step-5 static-analysis annotations. |
+| `pr-debug-inspect.annotations.json` | Static-analysis annotations. |
 | `generate_report.py` | Runs the pipeline with the scripted model and writes `report/`. |
 | `report/threat-delta.md` · `.sarif` · `deltas.json` | The generated outputs. |
 

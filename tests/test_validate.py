@@ -1,4 +1,4 @@
-"""Tests for threat_delta.validate (baseline referential-integrity, spec §3)."""
+"""Tests for threat_delta.validate (baseline referential-integrity)."""
 
 from __future__ import annotations
 

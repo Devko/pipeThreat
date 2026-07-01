@@ -1,10 +1,10 @@
-"""Input loaders for the Threat-Model Delta step (pipeline step 6).
+"""Input loaders for the Threat-Model Delta analysis.
 
-This module parses the *pipeline inputs* — the PR diff (step 1 / scope), the
-static-analysis annotations (step 5) and the SAST/secrets/CVE findings
-(steps 2-4) — into the plain value objects declared in :mod:`threat_delta.models`.
+This module parses the *inputs* — the PR diff (the changed files for this PR), the
+static-analysis annotations and the SAST/secrets/CVE findings — into the plain
+value objects declared in :mod:`threat_delta.models`.
 
-It performs only I/O and parsing; no relevance resolution (that is stage 6a in
+It performs only I/O and parsing; no relevance resolution (that is Stage 1 in
 :mod:`threat_delta.relevance`) and no LLM calls.
 """
 
@@ -185,7 +185,7 @@ def load_diff(path: PathLike) -> Diff:
 
 
 # --------------------------------------------------------------------------- #
-# Annotations (step 5)
+# Annotations (static-analysis)
 # --------------------------------------------------------------------------- #
 
 def _annotation_from(path: str, raw: dict) -> FileAnnotation:
@@ -198,7 +198,7 @@ def _annotation_from(path: str, raw: dict) -> FileAnnotation:
 
 
 def load_annotations(path: Optional[PathLike]) -> list[FileAnnotation]:
-    """Load step-5 file annotations.
+    """Load static-analysis file annotations.
 
     Accepts either a JSON list of ``{path, entry_points, ...}`` objects or an
     object mapping ``path -> {entry_points, ...}``. Optional input: returns
@@ -222,7 +222,7 @@ def load_annotations(path: Optional[PathLike]) -> list[FileAnnotation]:
 
 
 # --------------------------------------------------------------------------- #
-# Findings (steps 2-4)
+# Findings (SAST/secrets/CVE)
 # --------------------------------------------------------------------------- #
 
 def load_findings(path: Optional[PathLike]) -> list[Finding]:

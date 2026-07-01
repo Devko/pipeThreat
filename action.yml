@@ -1,4 +1,4 @@
-# Composite GitHub Action — integrate the Threat-Model Delta step directly from
+# Composite GitHub Action — integrate the Threat-Model Delta analysis directly from
 # this repo with one line in a consumer workflow:
 #
 #   - uses: Devko/pipeThreat@main
@@ -6,10 +6,10 @@
 #       baseline: threat-model.yaml
 #
 # It installs the package from *this action's own checkout* (no network/git
-# install needed), resolves the PR diff if one isn't supplied, runs the step, and
+# install needed), resolves the PR diff if one isn't supplied, runs the analysis, and
 # exposes the SARIF + comment as outputs for the caller to upload/post.
 name: "Threat-Model Delta"
-description: "Advisory, non-blocking threat-model delta analysis for a pull request (pipeline step 6)."
+description: "Advisory, non-blocking threat-model delta analysis for a pull request."
 author: "pipeThreat"
 branding:
   icon: shield
@@ -29,11 +29,11 @@ inputs:
     required: false
     default: ""
   annotations:
-    description: "Path to step-5 annotations JSON (optional)."
+    description: "Path to static-analysis annotations JSON (optional)."
     required: false
     default: ""
   findings:
-    description: "Path to step 2-4 findings JSON (optional)."
+    description: "Path to SAST/secrets/CVE findings JSON (optional)."
     required: false
     default: ""
   pr:
@@ -51,12 +51,12 @@ inputs:
   llm:
     description: >-
       LLM transport (required): 'ollama' provisions a local Gemma-class model on
-      the runner for real 6b/6c/6d signal; 'openai' targets an existing endpoint;
+      the runner for real Stage 2/3/4 signal; 'openai' targets an existing endpoint;
       'stub' is an offline dry-run that reports nothing (testing only). There is
       no default — the step will not run without a chosen model.
     required: true
   llm-model:
-    description: "Ollama model to pull/run when llm=ollama (CPU-friendly ~4B)."
+    description: "Ollama model to pull/run when llm=ollama (CPU-friendly, e.g. gemma4:e2b)."
     required: false
     default: "gemma4:e2b"
   python-version:

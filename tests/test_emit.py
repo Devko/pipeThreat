@@ -1,4 +1,4 @@
-"""Tests for the SARIF + PR-comment emitters (spec §6e, §8, §9)."""
+"""Tests for the SARIF + PR-comment emitters."""
 
 from __future__ import annotations
 

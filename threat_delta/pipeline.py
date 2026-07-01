@@ -1,28 +1,28 @@
-"""Stage orchestration and delta assembly for pipeline step 6.
+"""Stage orchestration and delta assembly.
 
-Wires the per-stage modules into the flow from spec §5:
+Wires the per-stage modules into the flow:
 
-    6a resolve_slice         (deterministic)
-    6b classify_change       (voted)             -- gates 6c AND 6d
-    6c stride_deltas         (per component, voted)
-    6d assumption_check      (per assumption, voted)
-    6e assemble + score + emit (deterministic)
+    Stage 1 resolve_slice         (deterministic)
+    Stage 2 classify_change       (voted)             -- gates Stages 3 AND 4
+    Stage 3 stride_deltas         (per component, voted)
+    Stage 4 assumption_check      (per assumption, voted)
+    Stage 5 assemble + score + emit (deterministic)
 
-    Each model-driven stage (6b/6c/6d) samples ``LLMConfig.votes`` times and keeps
-    the majority (``votes=1`` by default = one call). 6c fans out one call per
-    affected component; 6d fans out one call per assumption.
+    Each model-driven stage (Stages 2/3/4) samples ``LLMConfig.votes`` times and keeps
+    the majority (``votes=1`` by default = one call). Stage 3 fans out one call per
+    affected component; Stage 4 fans out one call per assumption.
 
-The *assembly* in 6e is the cross-cutting glue: it turns the raw stage outputs
-(untracked paths from 6a, coarse flags from 6b, per-component STRIDE from 6c,
-assumption violations from 6d) into the final scored :class:`Delta` objects of
-spec §8, applying the deterministic §7 severity rules.
+The *assembly* in Stage 5 is the cross-cutting glue: it turns the raw stage outputs
+(untracked paths from Stage 1, coarse flags from Stage 2, per-component STRIDE from Stage 3,
+assumption violations from Stage 4) into the final scored :class:`Delta` objects,
+applying the deterministic severity rules.
 
-Assembly model (faithful to §6e's literal "dedupe by (type, affected_elements)"):
-one delta per *(type, affected element)* rather than one consolidated delta per
-component. Every positive flag and every violated assumption is represented and
-independently severity-scored, so nothing is silently merged away. The
-worked-example's narrative "one delta" therefore appears here as a small set of
-per-(type, element) deltas covering the same change.
+Assembly model: each affected component's positive change-signals collapse into a
+single scored delta — the most severe signal sets its type and severity, and the
+rest ride along as ``change_signals`` — while each violated assumption becomes its
+own delta. So a component change plus the assumptions it breaks yields one
+component delta and one delta per assumption, deduped by
+``(type, affected_elements, contradicts_assumption)`` keeping the most severe.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ from .severity import (
 from .signals import regions_by_path, signals_for_component, signals_for_paths
 from .stride import stride_deltas
 
-# Map a positive 6b flag to the delta type it produces. Ordered by descending
+# Map a positive Stage 2 flag to the delta type it produces. Ordered by descending
 # tiebreak priority: when two flags compute the same severity, the representative
 # type for the collapsed component delta is the first present in this order.
 _FLAG_TO_TYPE: dict[str, DeltaType] = {
@@ -122,7 +122,7 @@ _RECOMMENDED_ACTION: dict[DeltaType, str] = {
 
 @dataclass
 class AnalysisResult:
-    """Everything 6e produces, plus the intermediate stage outputs for debugging."""
+    """Everything Stage 5 produces, plus the intermediate stage outputs for debugging."""
     pr: str
     deltas: list[Delta] = field(default_factory=list)
     slice: Slice | None = None
@@ -160,7 +160,7 @@ def analyze(
     max_hunk_chars: int = 4000,
     prior_keys: set[tuple] | None = None,
 ) -> AnalysisResult:
-    """Run stages 6a–6e and return the assembled, scored result.
+    """Run Stages 1–5 and return the assembled, scored result.
 
     ``prior_keys`` (from :func:`delta_key` over a previous run) suppresses
     unchanged deltas so a re-run on the same PR only surfaces what is new — the
@@ -168,27 +168,27 @@ def analyze(
     """
     pr = pr or diff.pr or "0"
 
-    # 6a — relevance resolution (deterministic). Bounds all downstream context.
+    # Stage 1 — relevance resolution (deterministic). Bounds all downstream context.
     sl = resolve_slice(diff, baseline)
     if sl.is_empty:
-        # Nothing matched and nothing untracked -> exit with no deltas (§6a).
+        # Nothing matched and nothing untracked -> exit with no deltas.
         return AnalysisResult(pr=pr, slice=sl)
 
     flags = Flags()
     stride_by_component: dict[str, list[StrideDelta]] = {}
     violations: list[Violation] = []
 
-    # Deterministic grounding facts fed to the model-driven stages (§6, §11).
+    # Deterministic grounding facts fed to the model-driven stages.
     all_changed_paths = sorted({p for ps in sl.matched_paths.values() for p in ps})
     slice_signals = signals_for_paths(all_changed_paths, diff, annotations)
 
-    # 6b/6c/6d only apply when the diff touched tracked components. (A pure
-    # untracked-path PR still emits its 6a untracked deltas below.)
+    # Stages 2/3/4 only apply when the diff touched tracked components. (A pure
+    # untracked-path PR still emits its Stage 1 untracked deltas below.)
     if sl.components:
-        # 6b — coarse classification (voted). Gates 6c AND 6d (§6b).
+        # Stage 2 — coarse classification (voted). Gates Stages 3 AND 4.
         flags = classify_change(sl, diff, annotations, llm)
         if flags.any_positive:
-            # 6c — STRIDE deltas, once per affected component (§6c), each call
+            # Stage 3 — STRIDE deltas, once per affected component, each call
             # grounded by that component's deterministic signals.
             for comp in sl.components:
                 hunks = _hunks_for_component(comp, diff, sl)
@@ -203,13 +203,13 @@ def analyze(
                 )
                 if deltas:
                     stride_by_component[comp.id] = deltas
-            # 6d — assumption contradiction, fanned out one call per assumption
-            # over the slice's assumptions (§6d, §11).
+            # Stage 4 — assumption contradiction, fanned out one call per assumption
+            # over the slice's assumptions.
             violations = assumption_check(
                 sl.assumptions, diff, annotations, llm, signals=slice_signals
             )
 
-    # 6e — assemble, score, dedupe (deterministic).
+    # Stage 5 — assemble, score, dedupe (deterministic).
     deltas = _assemble_deltas(
         pr=pr,
         sl=sl,
@@ -239,7 +239,7 @@ def analyze(
 
 
 # --------------------------------------------------------------------------- #
-# 6e — delta assembly (the cross-cutting glue)
+# Stage 5 — delta assembly (the cross-cutting glue)
 # --------------------------------------------------------------------------- #
 
 def _assemble_deltas(
@@ -259,7 +259,7 @@ def _assemble_deltas(
     regions = regions_by_path(diff)
     raw: list[Delta] = []
 
-    # --- untracked-path deltas (from 6a) ------------------------------------ #
+    # --- untracked-path deltas (from Stage 1) ------------------------------- #
     for path in sl.untracked_paths:
         in_finding = path in finding_paths
         severity = compute_severity(
@@ -299,7 +299,7 @@ def _assemble_deltas(
             )
         )
 
-    # --- one collapsed delta per component (from 6b flags + 6c STRIDE) ------- #
+    # --- one collapsed delta per component (from Stage 2 flags + Stage 3 STRIDE) --- #
     # Rather than N near-identical per-flag deltas, emit a single component delta
     # listing every positive change-signal, scored at the most severe of them.
     for comp in sl.components:
@@ -367,7 +367,7 @@ def _assemble_deltas(
             )
         )
 
-    # --- assumption-violation deltas (from 6d) ------------------------------ #
+    # --- assumption-violation deltas (from Stage 4) ------------------------- #
     changed_component_ids = [c.id for c in sl.components]
     slice_assets = _slice_assets(sl, baseline)
     guards_sensitive = any(
@@ -421,7 +421,7 @@ def _assemble_deltas(
             )
         )
 
-    # --- drop deltas referencing ids not in the baseline (§11 guard) -------- #
+    # --- drop deltas referencing ids not in the baseline (hallucination guard) --- #
     valid_ids = baseline.all_ids
     raw = [
         d
@@ -502,8 +502,8 @@ def _corroborated(
 ) -> bool:
     """True when an independent source touches one of ``paths``.
 
-    Corroboration = a step-5 annotation that actually carries signal
-    (entry points / untrusted inputs / sinks) **or** a step 2-4 finding on the
+    Corroboration = a static-analysis annotation that actually carries signal
+    (entry points / untrusted inputs / sinks) **or** a SAST/secrets/CVE finding on the
     same file. Used to raise confidence beyond the model's own say-so.
     """
     for p in paths:
@@ -589,7 +589,7 @@ def _combined_baseline_update(
 def delta_key(delta: Delta) -> tuple:
     """Stable identity of a delta across runs (dedupe + incremental subtraction).
 
-    §6e's "(type, affected_elements)" extended with ``contradicts_assumption``
+    The "(type, affected_elements)" identity extended with ``contradicts_assumption``
     (so two distinct violated assumptions are not collapsed) and, for untracked
     paths, the file set (so each drifted path is its own delta).
     """

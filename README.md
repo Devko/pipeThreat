@@ -56,26 +56,26 @@ look-alikes (the deltas stay separate in SARIF for tracking).
 
 ```mermaid
 flowchart LR
-    PR([PR diff]) --> A[6a resolve_slice]
+    PR([PR diff]) --> A[Stage 1 resolve_slice]
     A -- untracked paths --> E
-    A -- tracked code --> B{6b classify_change}
+    A -- tracked code --> B{Stage 2 classify_change}
     B -- all flags false --> E
-    B -- flag positive --> C[6c stride_deltas]
-    B -- flag positive --> D[6d assumption_check]
-    C --> E[6e assemble · score · emit]
+    B -- flag positive --> C[Stage 3 stride_deltas]
+    B -- flag positive --> D[Stage 4 assumption_check]
+    C --> E[Stage 5 assemble · score · emit]
     D --> E
     E --> OUT([PR comment + SARIF])
 ```
 
 | Stage | Does | Kind |
 |---|---|---|
-| **6a** `resolve_slice` | Match changed paths to baseline `code_paths`; build the relevant slice; flag untracked paths | deterministic |
-| **6b** `classify_change` | Coarse flags — is a new entry point / data flow / boundary crossing / asset change / control change plausibly in play? | LLM · voted |
-| **6c** `stride_deltas` | Per affected component: which STRIDE categories does _this_ change introduce or worsen? Grounded with deterministic signals | LLM · per component |
-| **6d** `assumption_check` | Which stated assumptions does the diff violate or weaken? **One bounded call per assumption** (small models drop items when batched) | LLM · per assumption |
-| **6e** assemble + score + emit | Collapse each component's signals into one scored delta; group its assumption violations under one root cause; dedupe; render SARIF + PR comment | deterministic |
+| **1** `resolve_slice` | Match changed paths to baseline `code_paths`; build the relevant slice; flag untracked paths | deterministic |
+| **2** `classify_change` | Coarse flags — is a new entry point / data flow / boundary crossing / asset change / control change plausibly in play? | LLM · voted |
+| **3** `stride_deltas` | Per affected component: which STRIDE categories does _this_ change introduce or worsen? Grounded with deterministic signals | LLM · per component |
+| **4** `assumption_check` | Which stated assumptions does the diff violate or weaken? **One bounded call per assumption** (small models drop items when batched) | LLM · per assumption |
+| **5** assemble + score + emit | Collapse each component's signals into one scored delta; group its assumption violations under one root cause; dedupe; render SARIF + PR comment | deterministic |
 
-6b **gates** 6c and 6d: if every flag is false, the expensive calls are skipped and
+Stage 2 **gates** Stages 3 and 4: if every flag is false, the expensive calls are skipped and
 only deterministic `untracked_path` deltas remain. A typical PR is a handful of
 short, bounded calls (one classify, one per affected component, one per assumption)
 — async, so it never holds up the merge.
@@ -84,11 +84,11 @@ short, bounded calls (one classify, one per affected component, one per assumpti
 
 Four deterministic mechanisms keep the small-model output trustworthy:
 
-- **Deterministic signals** — before 6c/6d, the pipeline scans the added lines and the
+- **Deterministic signals** — before Stages 3/4, the pipeline scans the added lines and the
   static-analysis annotations for grounding facts (entry points, untrusted input →
   sink reach, missing auth/rate-limit/validation) and hands them to the model as data.
   It judges facts, it doesn't imagine threats.
-- **Per-assumption fan-out** — 6d asks one narrow yes/no question per assumption.
+- **Per-assumption fan-out** — Stage 4 asks one narrow yes/no question per assumption.
   Batching the whole list into one prompt is what makes small models silently drop
   violations.
 - **Self-consistency voting** (`--votes N`, off by default) — sample each call N times
@@ -213,7 +213,7 @@ The link to code is `code_paths` — globs (with `**`) that map each component t
 source, so a diff resolves to the elements it affects. See
 [`examples/threat-model.yaml`](examples/threat-model.yaml).
 
-When a PR touches code no component claims, 6a emits an `untracked_path` delta with a
+When a PR touches code no component claims, Stage 1 emits an `untracked_path` delta with a
 proposed baseline update; accepting it keeps the baseline in step with the code.
 
 Three deterministic helpers (no LLM) bootstrap and maintain it:
@@ -276,14 +276,14 @@ threat_delta/
   models.py             shared dataclasses — the contract between stages
   baseline.py           load + index threat-model.yaml
   diff.py               parse diffs, annotations, findings
-  relevance.py          6a — glob path matching → baseline slice
+  relevance.py          Stage 1 — glob path matching → baseline slice
   signals.py            deterministic grounding facts + hunk regions
   prompts.py            prompt templates (data-only, injection-resistant)
-  classify.py           6b — change classification
-  stride.py             6c — STRIDE deltas
-  assumptions.py        6d — assumption violations
+  classify.py           Stage 2 — change classification
+  stride.py             Stage 3 — STRIDE deltas
+  assumptions.py        Stage 4 — assumption violations
   severity.py           deterministic severity rules
-  emit.py               6e — SARIF 2.1.0 + PR comment
+  emit.py               Stage 5 — SARIF 2.1.0 + PR comment
   pipeline.py           orchestration + delta assembly
   step.py               run_step() — the standalone entry point
   llm.py                LLM client contract + offline stub + JSON recovery

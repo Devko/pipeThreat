@@ -1,4 +1,4 @@
-# Example threat-model baseline (spec §3).
+# Example threat-model baseline.
 # Human-authored, human-approved, version-controlled alongside the code.
 # `code_paths` is the linking mechanism: it maps threat-model elements to source
 # paths so a diff can resolve to the elements it affects.

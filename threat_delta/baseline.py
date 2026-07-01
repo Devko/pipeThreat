@@ -1,8 +1,8 @@
 """Load and index the human-authored threat-model baseline (threat-model.yaml).
 
-The baseline is the *context* for the whole step (spec §3). It is loaded once,
+The baseline is the *context* for the whole analysis. It is loaded once,
 validated, and exposed as a :class:`Baseline` with id->element lookup maps so the
-deterministic relevance stage (6a) can resolve a diff to the elements it affects.
+deterministic relevance stage (Stage 1) can resolve a diff to the elements it affects.
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ class Baseline:
     @property
     def all_ids(self) -> set[str]:
         """Every element id in the baseline — used to drop deltas that reference
-        ids which do not exist (hallucination guard, spec §11)."""
+        ids which do not exist (hallucination guard)."""
         return (
             set(self.assets_by_id)
             | set(self.boundaries_by_id)

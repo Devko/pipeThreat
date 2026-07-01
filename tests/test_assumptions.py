@@ -1,4 +1,4 @@
-"""Tests for stage 6d (threat_delta.assumptions) — per-assumption fan-out."""
+"""Tests for Stage 4 (threat_delta.assumptions) — per-assumption fan-out."""
 
 from __future__ import annotations
 

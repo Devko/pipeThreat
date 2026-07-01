@@ -1,4 +1,4 @@
-"""Tests for the 6b/6c/6d prompt builders (threat_delta.prompts)."""
+"""Tests for the Stage 2/3/4 prompt builders (threat_delta.prompts)."""
 
 from __future__ import annotations
 
