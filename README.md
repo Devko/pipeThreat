@@ -116,7 +116,7 @@ result = run_step(
     diff="pr.diff",                 # path or Diff
     annotations="annotations.json", # optional
     pr="1234",
-    llm=build_client("ollama"),     # defaults to an offline stub
+    llm=build_client("ollama"),     # required — no silent default; omitting it raises
 )
 
 result.deltas              # list[Delta]
@@ -137,25 +137,29 @@ threat-delta analyze \
   --baseline threat-model.yaml \
   --diff pr.diff \
   --pr 1234 \
+  --llm ollama \
   --sarif threat-delta.sarif \
   --comment threat-delta.md
 ```
 
-Exits `0` regardless of findings. `--fail-on-high` exits non-zero when a
-high-severity delta needs human review — pair it with a `security/needs-review`
-label and branch protection for a *human* gate (never a model gate).
+`--llm` is **required** — there is no silent default, so a run without a model
+errors instead of fabricating an empty "no deltas" result. Otherwise exits `0`
+regardless of findings. `--fail-on-high` exits non-zero when a high-severity
+delta needs human review — pair it with a `security/needs-review` label and
+branch protection for a *human* gate (never a model gate).
 
 ---
 
 ## Choosing a model
 
-Three transports ship in `threat_delta.transports` (standard library only):
+Three transports ship in `threat_delta.transports` (standard library only).
+`--llm` is required — there is no default, so a real model is a conscious choice:
 
 | `--llm` | Client | Target |
 |---|---|---|
-| `stub` *(default)* | offline — reports nothing rather than hallucinating | — |
 | `ollama` | `OllamaClient` | a local Ollama server (`gemma4:e2b`) |
 | `openai` | `OpenAICompatibleClient` | any OpenAI-compatible endpoint (llama.cpp, vLLM, LM Studio) |
+| `stub` | offline — reports nothing | dry-run / testing only |
 
 **Recommended: `gemma4:e2b` with reasoning on** (the defaults). Measured on a
 CPU-only `ubuntu-latest` runner against the [Synapse example](examples/synapse/):

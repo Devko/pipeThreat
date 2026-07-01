@@ -21,7 +21,7 @@ import json
 
 from .baseline import Baseline, load_baseline
 from .diff import load_annotations, load_diff, load_findings
-from .llm import LLMClient, ScriptedLLMClient
+from .llm import LLMClient, LLMError
 from .models import Delta, Diff, FileAnnotation, Finding, Severity
 from .pipeline import AnalysisResult, analyze, prior_keys_from_dicts
 
@@ -51,18 +51,28 @@ def run_step(
     * ``diff`` — path to a unified/structured diff or a :class:`Diff`.
     * ``annotations`` — step-5 annotations path / list / ``None``.
     * ``findings`` — step 2-4 findings path / list / ``None``.
-    * ``llm`` — an :class:`LLMClient`; defaults to the conservative offline stub
-      (reports nothing rather than hallucinating) so the step is runnable with no
-      model server wired up.
+    * ``llm`` — an :class:`LLMClient`; **required**. Pass
+      ``build_client("ollama"|"openai", ...)`` to analyze against a real model, or
+      an explicit ``ScriptedLLMClient`` for offline tests. There is deliberately
+      no silent default: running the step without a model would fabricate an empty
+      result and hide the fact that no analysis happened.
 
     Returns an :class:`AnalysisResult`; read ``.deltas``, ``.sarif`` and
-    ``.comment`` from it. Never blocks — gating is left to the caller.
+    ``.comment`` from it. Never blocks — gating is left to the caller. Raises
+    :class:`LLMError` if ``llm`` is ``None``.
     """
+    if llm is None:
+        raise LLMError(
+            "run_step requires an LLM client. Pass llm=build_client('ollama', ...) "
+            "(or 'openai') to analyze against a model, or an explicit "
+            "ScriptedLLMClient for offline tests. Refusing to run without a model — "
+            "a silent stub would report an empty result and hide that no analysis ran."
+        )
     bl = baseline if isinstance(baseline, Baseline) else load_baseline(baseline)
     df = diff if isinstance(diff, Diff) else load_diff(diff)
     anns = _resolve_annotations(annotations)
     finds = _resolve_findings(findings)
-    client = llm if llm is not None else ScriptedLLMClient(default={})
+    client = llm
 
     return analyze(
         df,

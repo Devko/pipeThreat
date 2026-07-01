@@ -59,9 +59,13 @@ def _add_llm_args(p: argparse.ArgumentParser) -> None:
     """Shared model-transport options (used by analyze and init --llm)."""
     p.add_argument(
         "--llm",
-        default="stub",
-        choices=["stub", "ollama", "openai"],
-        help="LLM transport (default: stub — offline, reports nothing)",
+        required=True,
+        choices=["ollama", "openai", "stub"],
+        help=(
+            "LLM transport (required): 'ollama'/'openai' run a real model; 'stub' "
+            "is an offline dry-run that reports nothing (testing only). There is no "
+            "default — running the analysis requires choosing a model."
+        ),
     )
     p.add_argument("--llm-base-url", help="OpenAI-compatible server base URL")
     p.add_argument("--llm-model", help="model name (e.g. gemma4:e2b)")

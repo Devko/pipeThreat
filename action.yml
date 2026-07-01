@@ -50,10 +50,11 @@ inputs:
     default: "4000"
   llm:
     description: >-
-      LLM transport: 'stub' (default — deterministic only, no model) or 'ollama'
-      (provision a local Gemma-class model on the runner for real 6b/6c/6d signal).
-    required: false
-    default: "stub"
+      LLM transport (required): 'ollama' provisions a local Gemma-class model on
+      the runner for real 6b/6c/6d signal; 'openai' targets an existing endpoint;
+      'stub' is an offline dry-run that reports nothing (testing only). There is
+      no default — the step will not run without a chosen model.
+    required: true
   llm-model:
     description: "Ollama model to pull/run when llm=ollama (CPU-friendly ~4B)."
     required: false

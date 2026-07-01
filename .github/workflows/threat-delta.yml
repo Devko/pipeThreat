@@ -28,11 +28,12 @@ jobs:
         uses: ./ # in a consumer repo: uses: Devko/pipeThreat@main
         with:
           baseline: examples/threat-model.yaml # consumer default: threat-model.yaml
-          # llm: stub is the default (deterministic only, no model). For real
-          # 6b/6c/6d signal, provision a local Gemma on the runner:
-          #   llm: ollama
-          #   llm-model: gemma4:e2b  # ~7.2GB; reasoning on by default, CPU runner
-          llm: stub
+          # llm is required — the step will not run without a chosen model.
+          # 'ollama' provisions a local Gemma on the CPU runner (~7.2GB, reasoning
+          # on by default). Use 'openai' to target an existing endpoint, or 'stub'
+          # for an offline dry-run that reports nothing (testing only).
+          llm: ollama
+          llm-model: gemma4:e2b
 
       - name: Upload SARIF
         if: always()

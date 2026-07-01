@@ -27,8 +27,9 @@ def test_run_step_accepts_paths(tmp_path):
     df = tmp_path / "pr.diff"
     df.write_text(UNTRACKED_DIFF, encoding="utf-8")
 
-    # All inputs as paths; default stub LLM. Only the 6a untracked delta appears.
-    result = run_step(baseline=str(bl), diff=str(df), pr="42")
+    # All inputs as paths; an explicit stub LLM. Only the 6a untracked delta
+    # appears (6a is deterministic and never calls the model).
+    result = run_step(baseline=str(bl), diff=str(df), pr="42", llm=ScriptedLLMClient(default={}))
     assert len(result.deltas) == 1
     assert result.deltas[0].type.value == "untracked_path"
     assert result.pr == "42"
@@ -56,8 +57,9 @@ def test_run_step_accepts_objects_worked_example():
     assert all(d.severity == Severity.HIGH for d in review)
 
 
-def test_run_step_defaults_are_conservative():
-    # No annotations, no findings, stub LLM -> no false positives on tracked code.
+def test_run_step_stub_is_conservative():
+    # No annotations, no findings, explicit stub LLM -> no false positives on
+    # tracked code.
     baseline = parse_baseline(BASELINE_DATA)
     diff = parse_unified_diff(
         "diff --git a/src/users/u.py b/src/users/u.py\n"
@@ -67,3 +69,20 @@ def test_run_step_defaults_are_conservative():
     result = run_step(baseline=baseline, diff=diff, llm=ScriptedLLMClient(default={}))
     assert result.deltas == []
     assert needs_human_review(result) == []
+
+
+def test_run_step_requires_an_llm():
+    # No silent stub default: omitting llm must error rather than fabricate an
+    # empty "no deltas" result that hides the fact no model ran.
+    import pytest
+
+    from threat_delta.llm import LLMError
+
+    baseline = parse_baseline(BASELINE_DATA)
+    diff = parse_unified_diff(
+        "diff --git a/src/users/u.py b/src/users/u.py\n"
+        "--- a/src/users/u.py\n+++ b/src/users/u.py\n@@ -1 +1 @@\n-a\n+b\n",
+        pr="1",
+    )
+    with pytest.raises(LLMError):
+        run_step(baseline=baseline, diff=diff)

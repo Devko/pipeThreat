@@ -28,7 +28,10 @@ def test_analyze_backcompat_no_subcommand(tmp_path, capsys):
         encoding="utf-8",
     )
     sarif = tmp_path / "out.sarif"
-    rc = main(["--baseline", str(bl), "--diff", str(diff), "--pr", "1", "--sarif", str(sarif)])
+    rc = main(
+        ["--baseline", str(bl), "--diff", str(diff), "--pr", "1", "--sarif", str(sarif),
+         "--llm", "stub"]
+    )
     assert rc == 0
     doc = json.loads(sarif.read_text())
     assert doc["version"] == "2.1.0"
@@ -43,7 +46,19 @@ def test_analyze_explicit_subcommand(tmp_path):
         "--- a/src/users/u.py\n+++ b/src/users/u.py\n@@ -1 +1 @@\n-a\n+b\n",
         encoding="utf-8",
     )
-    assert main(["analyze", "--baseline", str(bl), "--diff", str(diff)]) == 0
+    assert main(["analyze", "--baseline", str(bl), "--diff", str(diff), "--llm", "stub"]) == 0
+
+
+def test_analyze_requires_llm(tmp_path):
+    # No --llm -> argparse error (required). Running without a model must not
+    # silently succeed with a fabricated empty result.
+    import pytest
+
+    bl = _write_baseline(tmp_path)
+    diff = tmp_path / "pr.diff"
+    diff.write_text("diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n", encoding="utf-8")
+    with pytest.raises(SystemExit):
+        main(["analyze", "--baseline", str(bl), "--diff", str(diff)])
 
 
 def test_validate_ok_and_error(tmp_path, capsys):
