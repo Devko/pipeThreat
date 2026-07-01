@@ -10,6 +10,7 @@ not a whole-system model rebuilt from scratch on every push.**
 &nbsp;![Output](https://img.shields.io/badge/output-SARIF%202.1.0-8250df)
 &nbsp;![CI mode](https://img.shields.io/badge/CI-advisory%20%C2%B7%20non--blocking-2da44e)
 &nbsp;![LLM](https://img.shields.io/badge/LLM-local%20%C2%B7%20CPU--friendly-orange)
+&nbsp;[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 </div>
 
@@ -304,5 +305,10 @@ tests/                  pytest suite (every stage + end-to-end)
 pip install -e '.[dev]'
 python -m pytest -q
 ```
+
+## 📜 License
+
+[Apache License 2.0](LICENSE) © 2026 Devko — permissive, with an explicit patent
+grant (the norm for OWASP-ecosystem security tools).
 
 <div align="center"><sub>Advisory by design · deterministic severity · bring your own local model</sub></div>
