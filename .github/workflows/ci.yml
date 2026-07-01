@@ -28,12 +28,15 @@ jobs:
         run: threat-delta validate --baseline examples/threat-model.yaml
 
       - name: Smoke-test the CLI on the bundled example
+        # --llm stub: offline, deterministic dry-run (no model server on the CI
+        # runner); this checks the CLI wiring + SARIF shape, not model output.
         run: |
           threat-delta \
             --baseline examples/threat-model.yaml \
             --diff examples/pr-1234.diff \
             --annotations examples/pr-1234.annotations.json \
             --pr 1234 \
+            --llm stub \
             --sarif "$RUNNER_TEMP/out.sarif" \
             --comment "$RUNNER_TEMP/out.md"
           python -c "import json,sys; d=json.load(open('$RUNNER_TEMP/out.sarif')); assert d['version']=='2.1.0'; print('SARIF OK')"

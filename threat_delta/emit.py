@@ -268,7 +268,8 @@ def _format_assumption_group(members: list[Delta], comp_index: dict[str, Delta])
     lines.append(f"  - Confidence: {conf_text}")
 
     for d in members:
-        lines.append(f"  - `{d.contradicts_assumption}` — {_assumption_reason(d)}")
+        reason = _assumption_reason(d)
+        lines.append(f"  - `{d.contradicts_assumption}`" + (f" — {reason}" if reason else ""))
     lines.append(f"  - Recommended action: {members[0].recommended_action}")
     return "\n".join(lines)
 

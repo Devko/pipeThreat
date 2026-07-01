@@ -77,6 +77,24 @@ def test_classify_minority_flag_dropped():
 # Confidence
 # --------------------------------------------------------------------------- #
 
+def test_combined_baseline_update_kind_matches_representative_type():
+    # Regression: the proposed-update kind must match the delta's representative
+    # (highest-severity) signal, not merely the first present flag.
+    from threat_delta.models import Component, DeltaType
+    from threat_delta.pipeline import _combined_baseline_update
+
+    comp = Component(id="comp.x", name="X", trust_zone="edge")
+    # control_change is first in flag order, but asset_exposure is the rep type.
+    upd = _combined_baseline_update(
+        comp,
+        [DeltaType.CONTROL_CHANGE, DeltaType.ASSET_EXPOSURE],
+        [],
+        DeltaType.ASSET_EXPOSURE,
+    )
+    assert upd.kind == "component_asset_handling_changed"
+    assert upd.target == "comp.x"
+
+
 def test_confidence_rules():
     assert confidence_from_evidence(low_confidence=False, corroborated=True) == Confidence.HIGH
     assert confidence_from_evidence(low_confidence=False, corroborated=False) == Confidence.MEDIUM

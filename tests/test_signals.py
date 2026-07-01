@@ -64,3 +64,25 @@ def test_signals_suppressed_when_auth_present():
 def test_no_signals_for_unrelated_change():
     diff = _diff("+# just a comment\n+x = 1", path="util.py")
     assert signals_for_paths(["util.py"], diff, []) == []
+
+
+def test_keyword_scan_is_whole_token_not_substring():
+    # Regression: a literal '*' (multiplication/pointer) or words like 'oracle'
+    # / 'catalog.' must NOT be read as auth/public/audit signals.
+    from threat_delta.signals import _AUDIT_TERMS, _AUTH_TERMS, _PUBLIC_TERMS, _contains
+
+    assert not _contains("area := w * h", _PUBLIC_TERMS)  # '*' is not "public"
+    assert not _contains("p := *ptr", _PUBLIC_TERMS)
+    assert not _contains("connect to oracle", _AUTH_TERMS)  # 'acl' not in 'oracle'
+    assert not _contains("catalog.load()", _AUDIT_TERMS)    # 'log' not a term; no false audit
+    # Real tokens still match on a word boundary.
+    assert _contains("require_auth(token)", _AUTH_TERMS)
+    assert _contains("post('/webhook-public/:id')", _PUBLIC_TERMS)
+    assert _contains("logger.info(x)", _AUDIT_TERMS)
+
+
+def test_math_pointer_change_has_no_public_signal():
+    diff = _diff("+area := w * h\n+p := *ptr", path="m.go")
+    ann = [FileAnnotation(path="m.go", entry_points=["calc"])]
+    signals = signals_for_paths(["m.go"], diff, ann)
+    assert not any("public" in s for s in signals)

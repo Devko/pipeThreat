@@ -3,10 +3,14 @@
 Wires the per-stage modules into the flow from spec §5:
 
     6a resolve_slice         (deterministic)
-    6b classify_change       (1 LLM call)        -- gates 6c AND 6d
-    6c stride_deltas         (N LLM calls)       -- per affected component
-    6d assumption_check      (1 LLM call)
+    6b classify_change       (voted)             -- gates 6c AND 6d
+    6c stride_deltas         (per component, voted)
+    6d assumption_check      (per assumption, voted)
     6e assemble + score + emit (deterministic)
+
+    Each model-driven stage (6b/6c/6d) samples ``LLMConfig.votes`` times and keeps
+    the majority (``votes=1`` by default = one call). 6c fans out one call per
+    affected component; 6d fans out one call per assumption.
 
 The *assembly* in 6e is the cross-cutting glue: it turns the raw stage outputs
 (untracked paths from 6a, coarse flags from 6b, per-component STRIDE from 6c,
@@ -348,7 +352,7 @@ def _assemble_deltas(
                 stride=_dedupe_stride(comp_stride),
                 evidence=_evidence(comp_paths, entry_points, regions),
                 proposed_baseline_update=_combined_baseline_update(
-                    comp, present_types, entry_points
+                    comp, present_types, entry_points, rep_type
                 ),
                 low_confidence=low_conf,
                 severity_rationale=severity_rationale(
@@ -554,9 +558,17 @@ def _component_description(
 
 
 def _combined_baseline_update(
-    comp: Component, types: list[DeltaType], entry_points: list[str]
+    comp: Component,
+    types: list[DeltaType],
+    entry_points: list[str],
+    rep_type: DeltaType,
 ) -> ProposedBaselineUpdate:
-    """One proposed baseline edit covering all of a component's change-signals."""
+    """One proposed baseline edit covering all of a component's change-signals.
+
+    ``kind`` matches ``rep_type`` — the delta's representative (highest-severity)
+    signal — so the emitted delta type and its proposed-update kind never
+    disagree.
+    """
     parts: list[str] = []
     for dtype in types:
         if dtype == DeltaType.NEW_ENTRY_POINT:
@@ -570,8 +582,7 @@ def _combined_baseline_update(
             parts.append("review handles_assets")
         else:  # CONTROL_CHANGE
             parts.append("review affecting controls")
-    # Kind = the representative (first/highest-priority) signal's update kind.
-    kind = _BASELINE_UPDATE_KIND[types[0]]
+    kind = _BASELINE_UPDATE_KIND[rep_type]
     return ProposedBaselineUpdate(kind=kind, target=comp.id, change="; ".join(parts))
 
 

@@ -8,12 +8,13 @@ Subcommands:
     coverage   report which source paths no component claims (§6a/§10)
 
 ``analyze`` is the default: invoking ``threat-delta --baseline ... --diff ...``
-with no subcommand still works, so existing callers (the GitHub Action) are
-unaffected.
+with no subcommand still routes to it, so existing callers (the GitHub Action)
+are unaffected.
 
-By default ``analyze`` uses a deterministic offline stub model (no network), so
-the CLI runs end-to-end in CI without a model server. Point ``--llm`` at a real
-transport when one is wired up.
+``analyze`` requires ``--llm``: there is no default. Pass ``--llm stub`` for an
+offline, deterministic dry-run (reports nothing rather than hallucinating), or
+``--llm ollama``/``--llm openai`` to analyze against a real model. Running
+without a model errors instead of silently producing an empty result.
 """
 
 from __future__ import annotations
@@ -33,9 +34,10 @@ from .validate import has_errors, validate_file
 def _build_llm(args: argparse.Namespace) -> LLMClient:
     """Construct the LLM client from the shared --llm/--llm-* options.
 
-    ``stub`` (default) is the offline, conservative client (reports nothing
-    rather than hallucinating). ``ollama``/``openai`` target a local
-    OpenAI-compatible server running a Gemma-class model.
+    ``--llm`` is required (no default). ``ollama``/``openai`` target a local
+    OpenAI-compatible server running a Gemma-class model; ``stub`` is the
+    offline, conservative client (reports nothing rather than hallucinating) for
+    dry-runs and tests.
     """
     # Reasoning is ON by default (spec §2): on a small model like gemma4:e2b it
     # is affordable on CPU and gives the best results (richer STRIDE + the

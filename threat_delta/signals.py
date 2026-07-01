@@ -31,9 +31,9 @@ _AUTH_TERMS = (
     "token", "apikey", "api_key", "credential", "login", "session", "acl",
 )
 _RATELIMIT_TERMS = ("rate limit", "ratelimit", "rate_limit", "throttle", "quota")
-_PUBLIC_TERMS = ("public", "unauthenticated", "anonymous", "/webhook", "*")
+_PUBLIC_TERMS = ("public", "unauthenticated", "anonymous", "webhook")
 _VALIDATION_TERMS = ("validate", "validation", "sanitize", "sanitise", "escape", "schema")
-_AUDIT_TERMS = ("audit", "log.", "logger", "logging", "journal")
+_AUDIT_TERMS = ("audit", "logger", "logging", "journal")
 
 
 def _added_lines(file: ChangedFile) -> list[str]:
@@ -51,7 +51,18 @@ def _added_lines(file: ChangedFile) -> list[str]:
 
 
 def _contains(haystack: str, terms) -> bool:
-    return any(term in haystack for term in terms)
+    """Whole-token match of any ``term`` in ``haystack`` (already lowercased).
+
+    Uses alnum boundaries rather than raw substring so a keyword only fires as a
+    word: ``public`` does not match ``publickey``, ``acl`` does not match
+    ``oracle``, ``logger`` does not match ``blogger``. This keeps the scan the
+    "conservative, a signal means the token literally appears" guarantee the
+    module docstring promises.
+    """
+    for term in terms:
+        if re.search(r"(?<![a-z0-9])" + re.escape(term) + r"(?![a-z0-9])", haystack):
+            return True
+    return False
 
 
 def hunk_start_line(header: str) -> int | None:
